@@ -1,0 +1,32 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.iyadk</groupId>
+  <artifactId>term-search</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>Term Search</name>
+  <description>A simple CLI that searches for millions of terms in a large corpus using a minimal set of technologies in an efficient manner</description>
+  <dependencies>
+  	<dependency>
+  		<groupId>org.apache.lucene</groupId>
+  		<artifactId>lucene-core</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>info.picocli</groupId>
+  		<artifactId>picocli</artifactId>
+  	</dependency>
+  </dependencies>
+  <dependencyManagement>
+  	<dependencies>
+  		<dependency>
+  			<groupId>org.apache.lucene</groupId>
+  			<artifactId>lucene-core</artifactId>
+  			<version>8.2.0</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>info.picocli</groupId>
+  			<artifactId>picocli</artifactId>
+  			<version>4.0.4</version>
+  		</dependency>
+  	</dependencies>
+  </dependencyManagement>
+</project>
