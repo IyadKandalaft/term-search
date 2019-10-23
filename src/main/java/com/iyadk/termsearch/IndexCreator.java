@@ -1,12 +1,17 @@
 package com.iyadk.termsearch;
 
-import java.io.File;
+import java.io.BufferedReader;
+import java.io.CharArrayReader;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.io.RandomAccessFile;
+import java.nio.CharBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.stream.Stream;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -46,15 +51,61 @@ public class IndexCreator {
 		
 		IndexSchema schema = new IndexSchema();
 		
-		File f = new File(corpusPath.toString());
-		try(Stream<String> lines = Files.lines(f.toPath(), StandardCharsets.UTF_8)){
-		    lines.forEach(line -> System.out.println(line));
-		} catch (IOException e) {}
-		
-		writer.addDocument(schema.createDocument("Test", "abc 123"));
+		// Read a file using memory mapping techniques to improve throughput
+		try (RandomAccessFile corpus = new RandomAccessFile(corpusPath.toFile(), "r")){
+            //Get file channel in read-only mode
+            FileChannel fileChannel = corpus.getChannel();
+            
+            long lineNum = 1;
+            long readSize = (long)Integer.MAX_VALUE / 2;
+            filereadloop:
+            for (long filePosition = 0; filePosition < fileChannel.size(); filePosition += readSize) {
+	            if ( fileChannel.size() - filePosition < readSize )
+	            	readSize = fileChannel.size() - filePosition;
+	            	
+	            System.out.printf("filePosition: %d \t readSize: %d \t fileSize: %d" + System.lineSeparator(), filePosition, readSize, fileChannel.size());
+	            
+            	//Get direct byte buffer access using channel.map() operation
+	            MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, filePosition, readSize);
+	            CharsetDecoder decoder = Charset.defaultCharset().newDecoder();
+	            CharBuffer charBuffer = decoder.decode(mappedByteBuffer);
+	            
+	            // BufferedReader to walk through the file line by line
+	            BufferedReader bufferedReader = new BufferedReader(new CharArrayReader(charBuffer.array())); 
+	            String line;
+	            
+	            while ((line = bufferedReader.readLine()) != null) {
+	            	String splitLine[] = line.split(":", 2);
+	            	if (splitLine.length != 2) {
+	            		System.out.printf("Line %d of corpus is not properly formatted: \n\t%s\n", lineNum, line);
+	            		continue;
+	            	}
+	            	
+	            	// Debuging
+	            	// System.out.println(line);
+	            	
+	            	writer.addDocument(schema.createDocument(splitLine[0], splitLine[1]));
+	            	
+	            	if ( lineNum++ % 100000 == 0 ) {
+	            		System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
+	            		// Debuging
+	            		//break filereadloop;
+	            	}
+	            	
+	            }
+            }
+            
+            fileChannel.close();
+		} catch (NoSuchFileException e) {
+			System.out.printf("The file %s does not exist.", corpusPath.toString());
+			writer.deleteAll();
+		}
 		
 		writer.close();
+		
 		dirIndex.close();
+		
+		System.out.println("Finished creating index");
 	}
 	
 	private class IndexSchema{

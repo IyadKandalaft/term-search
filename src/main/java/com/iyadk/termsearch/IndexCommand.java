@@ -7,16 +7,20 @@ import picocli.CommandLine.Option;
 
 @Command(name = "index")
 public class IndexCommand implements Callable<Integer> {
-	@Option(names={"-f", "--corpus"}, description="Path to the Corpus text to index", required=true)
+	@Option(names={"-f", "--corpus"}, 
+			description="Path to the Corpus text to index", 
+			required=true)
 	private String corpusFile;
 	
-	@Option(names={"-i", "--index", "--index-path"}, description="Path to create the index in")
+	@Option(names={"-i", "--index", "--index-path"}, 
+			description="Path to create the index in", 
+			defaultValue = "./lucene-index")
 	private String indexDir;
 
 	public Integer call() throws Exception {
 		System.out.println("Creating index");
 		
-		IndexCreator indexCreator = new IndexCreator(corpusFile);
+		IndexCreator indexCreator = new IndexCreator(corpusFile, indexDir);
 		
 		indexCreator.create();
 		
