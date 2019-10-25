@@ -132,7 +132,7 @@ public class IndexCreator {
 			contentField.setStoreTermVectors( true );
 			contentField.setStoreTermVectorPositions( true );
 			contentField.setTokenized( true );
-			contentField.setStored( false );
+			contentField.setStored( true );
 			contentField.freeze();
 		}
 		

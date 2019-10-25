@@ -14,6 +14,10 @@
   		<groupId>info.picocli</groupId>
   		<artifactId>picocli</artifactId>
   	</dependency>
+  	<dependency>
+  		<groupId>org.apache.lucene</groupId>
+  		<artifactId>lucene-queryparser</artifactId>
+  	</dependency>
   </dependencies>
   <dependencyManagement>
   	<dependencies>
@@ -26,6 +30,11 @@
   			<groupId>info.picocli</groupId>
   			<artifactId>picocli</artifactId>
   			<version>4.0.4</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>org.apache.lucene</groupId>
+  			<artifactId>lucene-queryparser</artifactId>
+  			<version>8.2.0</version>
   		</dependency>
   	</dependencies>
   </dependencyManagement>
