@@ -13,7 +13,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
@@ -42,7 +42,7 @@ public class IndexCreator {
 	
 	public void create() throws IOException {
 		dirIndex = new MMapDirectory(indexPath);
-		StandardAnalyzer analyzer = new StandardAnalyzer();
+		WhitespaceAnalyzer analyzer = new WhitespaceAnalyzer();
 		IndexWriterConfig writerConfig = new IndexWriterConfig(analyzer);
 		
 		writerConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
@@ -115,7 +115,7 @@ public class IndexCreator {
 		public IndexSchema() {
 			createSchema();
 		}
-		
+
 		/*
 		 * Creates the field types for the index
 		 */
@@ -128,7 +128,7 @@ public class IndexCreator {
 			titleField.freeze();
 			
 			contentField = new FieldType();
-			contentField.setIndexOptions( IndexOptions.DOCS );
+			contentField.setIndexOptions( IndexOptions.DOCS_AND_FREQS_AND_POSITIONS );
 			contentField.setStoreTermVectors( true );
 			contentField.setStoreTermVectorPositions( true );
 			contentField.setTokenized( true );
