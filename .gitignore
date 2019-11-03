@@ -3,4 +3,5 @@ target/
 [Tt]erm*.txt
 *[Cc]orpus.txt
 *.swp
-hs_err*.log
+*.log
+output/
