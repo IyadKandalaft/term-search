@@ -13,7 +13,12 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
+import org.apache.lucene.analysis.core.WhitespaceTokenizerFactory;
+import org.apache.lucene.analysis.custom.CustomAnalyzer;
+import org.apache.lucene.analysis.en.EnglishPossessiveFilterFactory;
+import org.apache.lucene.analysis.standard.ClassicTokenizerFactory;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
@@ -42,7 +47,12 @@ public class IndexCreator {
 	
 	public void create() throws IOException {
 		dirIndex = new MMapDirectory(indexPath);
-		WhitespaceAnalyzer analyzer = new WhitespaceAnalyzer();
+		Analyzer analyzer = CustomAnalyzer.builder()
+				.withTokenizer(ClassicTokenizerFactory.class)
+				.addTokenFilter(EnglishPossessiveFilterFactory.class)
+				.addTokenFilter(FirstWordFilterFactory.class)
+				.build();
+		//WhitespaceAnalyzer analyzer = new WhitespaceAnalyzer();
 		IndexWriterConfig writerConfig = new IndexWriterConfig(analyzer);
 		
 		writerConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
@@ -85,7 +95,7 @@ public class IndexCreator {
 	            	// System.out.println(line);
 	            	
 	            	writer.addDocument(schema.createDocument(splitLine[0], splitLine[1]));
-	            	
+
 	            	if ( lineNum++ % 100000 == 0 ) {
 	            		System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
 	            		// Debuging

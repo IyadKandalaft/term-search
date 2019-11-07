@@ -209,7 +209,7 @@ class TestSearchIndex {
 	@Test
 	void testSearchInsideQuotes() {
 		String field = "content";
-		String phrase = "quotes";
+		String phrase = "quote";
 		try {
 			TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
@@ -223,7 +223,7 @@ class TestSearchIndex {
 				Document d = indexSearcher.searcher.doc(sd.doc);
 
 				assertTrue(String.format("Terms found inside quotes for phrase/term: %s", phrase),
-						(d.get(field).contentEquals("This is sample text where a term is surrounded by \"quotes\"")
+						(d.get(field).contentEquals("This is sample text where a term is surrounded by \"quote\"")
 								|| d.get(field).contentEquals("This is sample text where a term ends with \"a quote\"")
 								|| d.get(field).contentEquals(
 										"This is sample text where a term starts with a \"quote only\"")));
@@ -252,14 +252,40 @@ class TestSearchIndex {
 				Document d = indexSearcher.searcher.doc(sd.doc);
 
 				assertTrue(String.format("Result without a hyphen was matched for phrase/term: %s", phrase),
-						d.get(field).equals("This is sample text where a term is prefixed by a -hyphen")
-								|| d.get(field).equals("This is sample text where a term is suffixed by a hyphen-"));
+						d.get(field).equals("This is sample text where a term is suffixed by a hyphen-term")
+								|| d.get(field).equals("This is sample text where a term is prefixed by a term-hyphen"));
 			}
 
 		} catch (IOException e) {
 			fail("Exception raised while searching index");
 			e.printStackTrace();
 			return;
+		}
+	}
+	
+	@Test
+	void testSearchPhraseIgnoreFirstWord() {
+		String field = "content";
+		String phrase = "My";
+		
+		try {
+			TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+			assertNotEquals(0, results.scoreDocs.length,
+					String.format("No results found for search phrase/term: %s", phrase));
+			assertEquals(1, results.scoreDocs.length,
+					String.format("Incorrect number of results were found for search phrase: %s", phrase));
+
+			for (ScoreDoc sd : results.scoreDocs) {
+				Document d = indexSearcher.searcher.doc(sd.doc);
+
+				assertTrue(String.format("Result without a hyphen was matched for phrase/term: %s", phrase),
+						d.get(field).equals("My sample text where a the first term My is not matched but the second one is"));
+			}
+
+		} catch (IOException e) {
+			fail("Exception raised while searching index");
+			e.printStackTrace();
 		}
 	}
 
