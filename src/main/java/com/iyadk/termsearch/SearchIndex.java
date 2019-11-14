@@ -9,17 +9,24 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.ParseException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.expressions.Expression;
+import org.apache.lucene.expressions.SimpleBindings;
+import org.apache.lucene.expressions.js.JavascriptCompiler;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.queries.function.FunctionScoreQuery;
+import org.apache.lucene.search.DoubleValuesSource;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.highlight.Highlighter;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
@@ -35,6 +42,7 @@ public class SearchIndex {
 	private Path outputPath;
 	private int searchLimit = 100;
 	private int highlightLimit = 500;
+	DoubleValuesSource scoringMethod;
 
 	private Directory dirIndex;
 	private IndexReader reader;
@@ -76,6 +84,18 @@ public class SearchIndex {
 		searcher = new IndexSearcher(reader);
 		formatter = new SimpleHTMLFormatter("[ ", " ]");
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
+
+		// Configure scoring of matched documents by dividing the computed "_score"
+		// by the value of the "score" field associated with the indexed document
+		try {
+			Expression expr = JavascriptCompiler.compile("_score / score");
+			SimpleBindings bindings = new SimpleBindings();
+			bindings.add(new SortField("_score", SortField.Type.SCORE));
+			bindings.add(new SortField("score", SortField.Type.INT));
+			scoringMethod = expr.getDoubleValuesSource(bindings);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public int getSearchLimit() {
@@ -136,37 +156,29 @@ public class SearchIndex {
 					
 					@Override
 					public void run() {
-						System.out.print("Searching for: ");
-				    	System.out.print(searchString);
-				    	System.out.print(lnSeperator);
+						System.out.print("Searching for: " + searchString + lnSeperator);
 
 				    	Query query = getQuery(searchString, field);
+
 				    	TopDocs searchResults;
 				    	
 						try {
 							searchResults = searchPhrase(searchString, field);
 				    	
-						for (ScoreDoc sd : searchResults.scoreDocs)
-					    {
-					        Document d = searcher.doc(sd.doc);
+							for (ScoreDoc sd : searchResults.scoreDocs)
+						    {
+						        Document d = searcher.doc(sd.doc);
+	
+				        		String fragment = getHighlightedField(query, analyzer, "content", d.get("content"));
+						        // TODO: Occasionally, fragment is null and throws an exception
+				        		if (fragment == null) {
+				        			continue;
+				        		}
+				        		
+								bufferedWriter.write(searchString + "\t" + d.get("title") + "\t" + fragment + lnSeperator);
+						    }
 
-			        		String fragment = getHighlightedField(query, analyzer, "content", d.get("content"));
-					        // TODO: Occasionally, fragment is null and throws an exception
-			        		if (fragment == null) {
-			        			continue;
-			        		}
-			        		
-					        bufferedWriter.write(searchString);
-					        bufferedWriter.write("\t");
-					        bufferedWriter.write(d.get("title"));
-			        		bufferedWriter.write("\t" );
-				            bufferedWriter.write(fragment);
-							bufferedWriter.write(lnSeperator);
-					    }
-
-				        System.out.print("Total Results ");
-				        System.out.print(searchResults.totalHits);
-				        System.out.print(lnSeperator);
+					        System.out.print("Total Results: " + searchResults.totalHits + lnSeperator);
 						} catch (IOException | InvalidTokenOffsetsException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
@@ -179,8 +191,7 @@ public class SearchIndex {
 	    }
 	    
     	threadPool.shutdown();
-	    while (!threadPool.isTerminated()) {
-        }
+	    while (!threadPool.isTerminated()) { }
 	    bufferedWriter.close();    
 	}
 
@@ -210,7 +221,8 @@ public class SearchIndex {
 	}
 
 	private Query getQuery(String phrase, String field) {
-		return new PhraseQuery(field, phrase.split(" "));
+		PhraseQuery phraseQuery = new PhraseQuery(field, phrase.split(" "));
+		return new FunctionScoreQuery(phraseQuery, scoringMethod);
 	}
 
 	private String getHighlightedField(Query query, Analyzer analyzer, String fieldName, String fieldValue)

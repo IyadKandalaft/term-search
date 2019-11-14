@@ -14,14 +14,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
-import org.apache.lucene.analysis.core.WhitespaceTokenizerFactory;
-import org.apache.lucene.analysis.custom.CustomAnalyzer;
-import org.apache.lucene.analysis.en.EnglishPossessiveFilterFactory;
-import org.apache.lucene.analysis.standard.ClassicTokenizerFactory;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
+import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -45,6 +41,10 @@ public class IndexCreator {
 		indexPath = Paths.get(index);
 	}
 	
+	public int getDocumentScore(String line) throws NumberFormatException, StringIndexOutOfBoundsException {
+		return Integer.parseInt(line.substring(line.length() - 5, line.length() - 4));
+	}
+	
 	public void create() throws IOException {
 		dirIndex = new MMapDirectory(indexPath);
 		Analyzer analyzer = UniqueAnalyzer.getInstance().analyzer;
@@ -52,7 +52,6 @@ public class IndexCreator {
 		IndexWriterConfig writerConfig = new IndexWriterConfig(analyzer);
 		
 		writerConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
-		
 		IndexWriter writer = new IndexWriter(dirIndex, writerConfig);
 		
 		IndexSchema schema = new IndexSchema();
@@ -63,7 +62,7 @@ public class IndexCreator {
             FileChannel fileChannel = corpus.getChannel();
             
             long lineNum = 1;
-            long readSize = (long)Integer.MAX_VALUE / 2;
+            long readSize = (long)Integer.MAX_VALUE / 4;
             filereadloop:
             for (long filePosition = 0; filePosition < fileChannel.size(); filePosition += readSize) {
 	            if ( fileChannel.size() - filePosition < readSize )
@@ -82,16 +81,28 @@ public class IndexCreator {
 	            
 	            while ((line = bufferedReader.readLine()) != null) {
 	            	String splitLine[] = line.split(":", 2);
+	            	// TODO: Add improved checking for title and content parsing 
 	            	if (splitLine.length != 2) {
-	            		System.out.printf("Line %d of corpus is not properly formatted: \n\t%s\n", lineNum, line);
+	            		System.out.printf("Line %d of corpus is not properly formatted: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
 	            		continue;
 	            	}
 	            	
 	            	// Debuging
 	            	// System.out.println(line);
 	            	
-	            	writer.addDocument(schema.createDocument(splitLine[0], splitLine[1]));
+	            	// Get the document score from the document title
+	            	int docScore;
+            		try {
+						docScore = getDocumentScore(splitLine[0]);
+					} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
+	            		System.out.printf("Unable to parse score from line %d of corpus: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
+						continue;
+					}
+	            	
+            		// Add the document to the index
+	            	writer.addDocument(schema.createDocument(splitLine[0], splitLine[1], docScore));
 
+	            	// Print a brief output every several thousand lines of the corpus on the line number being processed
 	            	if ( lineNum++ % 100000 == 0 ) {
 	            		System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
 	            		// Debuging
@@ -147,11 +158,12 @@ public class IndexCreator {
 		 * @param title The title of the document
 		 * @param content The content of the document
 		 */
-		public Document createDocument(String title, String content) {
+		public Document createDocument(String title, String content, int score) {
 			Document doc = new Document();
 			
 			doc.add(new Field("title", title, titleField));
 			doc.add(new Field("content", content, contentField));
+			doc.add(new NumericDocValuesField("score",score));
 			
 			return doc;
 		}
