@@ -47,11 +47,7 @@ public class IndexCreator {
 	
 	public void create() throws IOException {
 		dirIndex = new MMapDirectory(indexPath);
-		Analyzer analyzer = CustomAnalyzer.builder()
-				.withTokenizer(ClassicTokenizerFactory.class)
-				.addTokenFilter(EnglishPossessiveFilterFactory.class)
-				.addTokenFilter(FirstWordFilterFactory.class)
-				.build();
+		Analyzer analyzer = UniqueAnalyzer.getInstance().analyzer;
 		//WhitespaceAnalyzer analyzer = new WhitespaceAnalyzer();
 		IndexWriterConfig writerConfig = new IndexWriterConfig(analyzer);
 		

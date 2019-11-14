@@ -30,6 +30,20 @@ public class SearchCommand implements Callable<Integer> {
 			paramLabel="FILE")
 	private String outputFile;
 	
+	@Option(names={"-m", "--match-limit"},
+			description="Maximum number of matches to return",
+			defaultValue="100",
+			type=Integer.class, 
+			paramLabel="NUM")
+	private Integer matchLimit;
+	
+	@Option(names={"-h", "--highlight-limit"},
+			description="Maximum number of characters to return surrounding a matched term",
+			defaultValue="500",
+			type=Integer.class, 
+			paramLabel="NUM")
+	private Integer highlightLimit;
+	
 	public Integer call() throws Exception {
 		System.out.println("Executing search command");
 		
@@ -38,10 +52,11 @@ public class SearchCommand implements Callable<Integer> {
 		System.out.println("Start time: " + dateFormatter.format(new Date()));
 		System.out.println("-------------------------------------------------------");
 		
-		
 		SearchIndex indexSearcher = new SearchIndex(termsFile, outputFile);
 		indexSearcher.searchAll("content");
-		
+		indexSearcher.setSearchLimit(matchLimit);
+		indexSearcher.setHighlightLimit(highlightLimit);
+
 		indexSearcher.close();
 		
 		System.out.println("End time: " + dateFormatter.format(new Date()));
