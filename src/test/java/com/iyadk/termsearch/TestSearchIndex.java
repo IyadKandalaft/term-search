@@ -2,7 +2,6 @@ package com.iyadk.termsearch;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -233,6 +232,31 @@ class TestSearchIndex {
 
 			assertTrue(String.format("Result without a hyphen was matched for phrase/term: %s", phrase),
 					d.get(field).equals("My sample text where a the first term My is not matched but the second one is"));
+		}
+	}
+	
+	/*
+	 * Ensure that documents are returned in order based on their score
+	 */
+	@Test
+	void testSearchPhraseDocumentPriority() throws IOException {
+		String phrase = "priority";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertNotEquals(0, results.scoreDocs.length,
+				String.format("No results found for search phrase/term: %s", phrase));
+		assertEquals(5, results.scoreDocs.length,
+				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+
+		int i = 1;
+		for (ScoreDoc sd : results.scoreDocs) {
+			Document d = indexSearcher.searcher.doc(sd.doc);
+
+			assertTrue(String.format("Result without a hyphen was matched for phrase/term: %s", phrase),
+					d.get("title").equals("Test Doc 5 - " + i + ".txt"));
+			
+			i++;
 		}
 	}
 
