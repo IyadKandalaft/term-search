@@ -1,15 +1,11 @@
 package com.iyadk.termsearch;
 
 import java.io.BufferedReader;
-import java.io.CharArrayReader;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.CharBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.file.NoSuchFileException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -28,15 +24,17 @@ public class IndexCreator {
 	private Path corpusPath;
 	private Path indexPath;
 	private Directory dirIndex;
+	Analyzer analyzer;
 	/*
 	 * @param corpusPath Path to the corpus text
 	 */
-	public IndexCreator(String corpus) {
+	public IndexCreator(String corpus) throws IOException {
 		corpusPath = Paths.get(corpus);
 		indexPath = Paths.get("./lucene-index");
+		analyzer = UniqueAnalyzer.getInstance().analyzer;
 	}
 	
-	public IndexCreator(String corpus, String index) {
+	public IndexCreator(String corpus, String index) throws IOException {
 		this(corpus);
 		indexPath = Paths.get(index);
 	}
@@ -45,84 +43,49 @@ public class IndexCreator {
 		return Integer.parseInt(line.substring(line.length() - 5, line.length() - 4));
 	}
 	
-	public void create() throws IOException {
+	public void create() throws FileNotFoundException, IOException{
+    	InputStream fileInputStream = new FileInputStream(corpusPath.toFile());
+    	BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream), 128 * 2^20);
+
 		dirIndex = new MMapDirectory(indexPath);
-		Analyzer analyzer = UniqueAnalyzer.getInstance().analyzer;
-		//WhitespaceAnalyzer analyzer = new WhitespaceAnalyzer();
 		IndexWriterConfig writerConfig = new IndexWriterConfig(analyzer);
 		
 		writerConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
 		IndexWriter writer = new IndexWriter(dirIndex, writerConfig);
-		
-		IndexSchema schema = new IndexSchema();
-		
-		// Read a file using memory mapping techniques to improve throughput
-		try (RandomAccessFile corpus = new RandomAccessFile(corpusPath.toFile(), "r")){
-            //Get file channel in read-only mode
-            FileChannel fileChannel = corpus.getChannel();
-            
-            long lineNum = 1;
-            long readSize = (long)Integer.MAX_VALUE / 4;
-            filereadloop:
-            for (long filePosition = 0; filePosition < fileChannel.size(); filePosition += readSize) {
-	            if ( fileChannel.size() - filePosition < readSize )
-	            	readSize = fileChannel.size() - filePosition;
-	            	
-	            System.out.printf("filePosition: %d \t readSize: %d \t fileSize: %d" + System.lineSeparator(), filePosition, readSize, fileChannel.size());
-	            
-            	//Get direct byte buffer access using channel.map() operation
-	            MappedByteBuffer mappedByteBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, filePosition, readSize);
-	            CharsetDecoder decoder = Charset.defaultCharset().newDecoder();
-	            CharBuffer charBuffer = decoder.decode(mappedByteBuffer);
-	            
-	            // BufferedReader to walk through the file line by line
-	            BufferedReader bufferedReader = new BufferedReader(new CharArrayReader(charBuffer.array())); 
-	            String line;
-	            
-	            while ((line = bufferedReader.readLine()) != null) {
-	            	String splitLine[] = line.split(":", 2);
-	            	// TODO: Add improved checking for title and content parsing 
-	            	if (splitLine.length != 2) {
-	            		System.out.printf("Line %d of corpus is not properly formatted: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
-	            		continue;
-	            	}
-	            	
-	            	// Debuging
-	            	// System.out.println(line);
-	            	
-	            	// Get the document score from the document title
-	            	int docScore;
-            		try {
-						docScore = getDocumentScore(splitLine[0]);
-					} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
-	            		System.out.printf("Unable to parse score from line %d of corpus: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
-						continue;
-					}
-	            	
-            		// Add the document to the index
-	            	writer.addDocument(schema.createDocument(splitLine[0], splitLine[1], docScore));
 
-	            	// Print a brief output every several thousand lines of the corpus on the line number being processed
-	            	if ( lineNum++ % 100000 == 0 ) {
-	            		System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
-	            		// Debuging
-	            		//break filereadloop;
-	            	}
-	            	
-	            }
-            }
-            
-            fileChannel.close();
-		} catch (NoSuchFileException e) {
-			System.out.printf("The file %s does not exist.", corpusPath.toString());
-			writer.deleteAll();
-		}
-		
+		IndexSchema schema = new IndexSchema();
+
+        long lineNum = 1;
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+        	String splitLine[] = line.split(":", 2);
+        	// TODO: Add improved checking for title and content parsing 
+        	if (splitLine.length != 2) {
+        		System.out.printf("Line %d of corpus is not properly formatted: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
+        		continue;
+        	}
+
+        	// Get the document score from the document title
+        	int docScore;
+    		try {
+    			docScore = getDocumentScore(splitLine[0]);
+			} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
+        		System.out.printf("Unable to parse score from line %d of corpus: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
+				continue;
+			}
+
+    		// Add the document to the index
+        	writer.addDocument(schema.createDocument(splitLine[0], splitLine[1], docScore));
+
+        	// Print a brief output every several thousand lines of the corpus on the line number being processed
+        	if ( lineNum++ % 100000 == 0 ) {
+        		System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
+        	}
+        }
+        
+	    bufferedReader.close();
 		writer.close();
-		
 		dirIndex.close();
-		
-		System.out.println("Finished creating index");
 	}
 	
 	private class IndexSchema{
