@@ -24,7 +24,9 @@ public class IndexCreator {
 	private Path corpusPath;
 	private Path indexPath;
 	private Directory dirIndex;
-	Analyzer analyzer;
+	private String delimeter;
+	private Analyzer analyzer;
+
 	/*
 	 * @param corpusPath Path to the corpus text
 	 */
@@ -32,15 +34,32 @@ public class IndexCreator {
 		corpusPath = Paths.get(corpus);
 		indexPath = Paths.get("./lucene-index");
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
+		delimeter = ".txt:";
 	}
 	
 	public IndexCreator(String corpus, String index) throws IOException {
 		this(corpus);
 		indexPath = Paths.get(index);
 	}
+
+	public String getDelimeter() {
+		return delimeter;
+	}
+
+	public void setDelimeter(String delimeter) {
+		this.delimeter = delimeter;
+	}
 	
-	public int getDocumentScore(String line) throws NumberFormatException, StringIndexOutOfBoundsException {
-		return Integer.parseInt(line.substring(line.length() - 5, line.length() - 4));
+	/*
+	 * Retrieves the score to assign to the document
+	 * 
+	 * This is retrieved from the title using a position. A regex might be
+	 * appropriate but can negatively impact performance.
+	 * 
+	 *  @param documentTitle Document title containing the document score to parse
+	 */
+	public int parseDocumentScore(String documentTitle) throws NumberFormatException, StringIndexOutOfBoundsException {
+		return Integer.parseInt(documentTitle.substring(documentTitle.length() - 1, documentTitle.length()));
 	}
 	
 	public void create() throws FileNotFoundException, IOException{
@@ -58,7 +77,9 @@ public class IndexCreator {
         long lineNum = 1;
         String line;
         while ((line = bufferedReader.readLine()) != null) {
-        	String splitLine[] = line.split(":", 2);
+        	lineNum++;
+        	
+        	String splitLine[] = line.split(delimeter, 2);
         	// TODO: Add improved checking for title and content parsing 
         	if (splitLine.length != 2) {
         		System.out.printf("Line %d of corpus is not properly formatted: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
@@ -68,7 +89,7 @@ public class IndexCreator {
         	// Get the document score from the document title
         	int docScore;
     		try {
-    			docScore = getDocumentScore(splitLine[0]);
+    			docScore = parseDocumentScore(splitLine[0]);
 			} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
         		System.out.printf("Unable to parse score from line %d of corpus: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
 				continue;
@@ -78,7 +99,7 @@ public class IndexCreator {
         	writer.addDocument(schema.createDocument(splitLine[0], splitLine[1], docScore));
 
         	// Print a brief output every several thousand lines of the corpus on the line number being processed
-        	if ( lineNum++ % 100000 == 0 ) {
+        	if ( lineNum % 100000 == 0 ) {
         		System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
         	}
         }

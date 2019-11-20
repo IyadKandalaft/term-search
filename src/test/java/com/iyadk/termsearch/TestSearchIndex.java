@@ -254,7 +254,7 @@ class TestSearchIndex {
 			Document d = indexSearcher.searcher.doc(sd.doc);
 
 			assertTrue(String.format("Result without a hyphen was matched for phrase/term: %s", phrase),
-					d.get("title").equals("Test Doc 5 - " + i + ".txt"));
+					d.get("title").startsWith("Test Doc 5 - " + i));
 			
 			i++;
 		}
