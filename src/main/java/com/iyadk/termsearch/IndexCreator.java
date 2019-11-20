@@ -45,7 +45,7 @@ public class IndexCreator {
 	
 	public void create() throws FileNotFoundException, IOException{
     	InputStream fileInputStream = new FileInputStream(corpusPath.toFile());
-    	BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream), 128 * 2^20);
+    	BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream), 262144);
 
 		dirIndex = new MMapDirectory(indexPath);
 		IndexWriterConfig writerConfig = new IndexWriterConfig(analyzer);
