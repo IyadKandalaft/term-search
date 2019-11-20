@@ -17,8 +17,13 @@ public class IndexCommand implements Callable<Integer> {
 	
 	@Option(names={"-i", "--index", "--index-path"}, 
 			description="Path to create the index in", 
-			defaultValue = "./lucene-index")
+			defaultValue="./lucene-index")
 	private String indexDir;
+	
+	@Option(names={"-d", "--delimeter"},
+			description="Delimeter (regex) to use to split corpus lines into document titles and content",
+			defaultValue=".txt:")
+	private String delimeter;
 
 	public Integer call() throws Exception {
 		System.out.println("Creating index");
@@ -29,6 +34,8 @@ public class IndexCommand implements Callable<Integer> {
 		System.out.println("-------------------------------------------------------");
 
 		IndexCreator indexCreator = new IndexCreator(corpusFile, indexDir);
+		
+		indexCreator.setDelimeter(delimeter);
 
 		try {
 			indexCreator.create();
