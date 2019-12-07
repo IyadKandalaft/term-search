@@ -59,7 +59,7 @@ public class SearchIndex {
 
 	/*
 	 * @param terms Path to file with each search phrase/term per line
-	 * 
+	 *
 	 * @param output Path to output file where results are written
 	 */
 	public SearchIndex(String terms, String output) throws IOException {
@@ -68,9 +68,9 @@ public class SearchIndex {
 
 	/*
 	 * @param terms Path to file with each phrase/term per line
-	 * 
+	 *
 	 * @param output Path to output file where results are written
-	 * 
+	 *
 	 * @param index Path to lucene index directory
 	 */
 	public SearchIndex(String terms, String output, String index) throws IOException {
@@ -116,7 +116,7 @@ public class SearchIndex {
 
 	/*
 	 * Search for all the terms/phrases in the supplied terms file
-	 * 
+	 *
 	 * @param field Name of the field to search
 	 */
 	public void searchAll(String field) throws IOException, InvalidTokenOffsetsException, InterruptedException {
@@ -136,72 +136,75 @@ public class SearchIndex {
 		FileWriter fileWriter = new FileWriter(outputFile);
 		BufferedWriter bufferedWriter = new BufferedWriter(fileWriter, 2^24);
 
-		// Use the correct line seperator based on the operating system
+		// Use the correct line separator based on the operating system
 		String lnSeperator = System.lineSeparator();
-		
+
         ExecutorService threadPool = Executors.newFixedThreadPool(6);
-		
-	    try ( BufferedReader in = Files.newBufferedReader(termsPath, StandardCharsets.UTF_8) ){
-	    	String phrase;
-		    while ( (phrase = in.readLine()) != null ) {
-		    	if ( phrase.trim().length() == 0)
-		    		continue;
-		    	
-		    	class subSearch implements Runnable {
-		    		private String searchString;
-		    		
-		    		subSearch(String s){
-		    			searchString = s;
-		    		}
-					
+
+		// Read the file using a memory buffer to improve performance
+		try (BufferedReader in = Files.newBufferedReader(termsPath, StandardCharsets.UTF_8)) {
+			String phrase;
+			while ((phrase = in.readLine()) != null) {
+				// Skip empty lines
+				if (phrase.trim().length() == 0) {
+					continue;
+				}
+
+				class subSearch implements Runnable {
+					private String searchString;
+
+					subSearch(String s) {
+						searchString = s;
+					}
+
 					@Override
 					public void run() {
-						System.out.print("Searching for: " + searchString + lnSeperator);
+						Query query = getQuery(searchString, field);
 
-				    	Query query = getQuery(searchString, field);
+						TopDocs searchResults;
 
-				    	TopDocs searchResults;
-				    	
 						try {
 							searchResults = searchPhrase(searchString, field);
-				    	
-							for (ScoreDoc sd : searchResults.scoreDocs)
-						    {
-						        Document d = searcher.doc(sd.doc);
-	
-				        		String fragment = getHighlightedField(query, analyzer, "content", d.get("content"));
-						        // TODO: Occasionally, fragment is null and throws an exception
-				        		if (fragment == null) {
-				        			continue;
-				        		}
-				        		
-								bufferedWriter.write(searchString + "\t" + d.get("title") + "\t" + fragment + lnSeperator);
-						    }
 
-					        System.out.print("Total Results: " + searchResults.totalHits + lnSeperator);
+							for (ScoreDoc sd : searchResults.scoreDocs) {
+								Document d = searcher.doc(sd.doc);
+
+								String fragment = getHighlightedField(query, analyzer, "content", d.get("content"));
+								// TODO: Occasionally, fragment is null and throws an exception
+								if (fragment == null) {
+									continue;
+								}
+
+								bufferedWriter
+										.write(searchString + "\t" + d.get("title") + "\t" + fragment + lnSeperator);
+							}
+
+							System.out.print("Searching for: " + searchString + lnSeperator + "Total Results: "
+									+ searchResults.totalHits + lnSeperator);
 						} catch (IOException | InvalidTokenOffsetsException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
 					}
 				}
-		    	
-		    	threadPool.execute(new subSearch(phrase));
-		    }
-	    }
-	    
-    	threadPool.shutdown();
-	    while (!threadPool.isTerminated()) { }
-	    bufferedWriter.close();    
+
+				threadPool.execute(new subSearch(phrase));
+			}
+		}
+
+		// Wait for all threads to terminate
+		threadPool.shutdown();
+		while (!threadPool.isTerminated()) {}
+		
+		bufferedWriter.close();
 	}
 
 	/*
 	 * Search for specific phrase or term in the loaded index
-	 * 
+	 *
 	 * @param phrase Phrase or term to search for
-	 * 
 	 * @param field Name of the field to search
-	 * 
+	 *
 	 * @return TopDocs results
 	 */
 	public TopDocs searchPhrase(String phrase, String field) throws IOException {
@@ -211,9 +214,9 @@ public class SearchIndex {
 
 	/*
 	 * Search for a query in the loaded index
-	 * 
+	 *
 	 * @param query Query to search the index with
-	 * 
+	 *
 	 * @return TopDocs results
 	 */
 	public TopDocs searchPhrase(Query query) throws IOException {
