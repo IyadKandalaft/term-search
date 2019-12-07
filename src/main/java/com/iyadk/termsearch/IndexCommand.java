@@ -25,7 +25,7 @@ public class IndexCommand implements Callable<Integer> {
 			defaultValue=".txt:")
 	private String delimeter;
 	
-	@Option(names={"-t", "--threads"},
+	@Option(names={"--threads"},
 			description="Number of threads/cores to use for indexing",
 			defaultValue="4")
 	private int threads;

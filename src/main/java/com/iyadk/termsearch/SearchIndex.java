@@ -43,6 +43,7 @@ public class SearchIndex {
 	private int searchLimit = 100;
 	private int highlightLimit = 500;
 	DoubleValuesSource scoringMethod;
+	private int numThreads = 4;
 
 	private Directory dirIndex;
 	private IndexReader reader;
@@ -114,6 +115,14 @@ public class SearchIndex {
 		this.highlightLimit = highlightLimit;
 	}
 
+	public int getNumThreads() {
+		return numThreads;
+	}
+
+	public void setNumThreads(int numThreads) {
+		this.numThreads = numThreads;
+	}
+	
 	/*
 	 * Search for all the terms/phrases in the supplied terms file
 	 *

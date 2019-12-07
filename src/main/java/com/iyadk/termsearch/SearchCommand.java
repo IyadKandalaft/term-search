@@ -44,6 +44,13 @@ public class SearchCommand implements Callable<Integer> {
 			paramLabel="NUM")
 	private Integer highlightLimit;
 	
+	@Option(names={"--threads"},
+			description="Number of threads/cores to use for searching",
+			defaultValue="4",
+			type=Integer.class, 
+			paramLabel="NUM")
+	private Integer threads;
+	
 	public Integer call() throws Exception {
 		System.out.println("Executing search command");
 		
@@ -56,9 +63,10 @@ public class SearchCommand implements Callable<Integer> {
 		indexSearcher.searchAll("content");
 		indexSearcher.setSearchLimit(matchLimit);
 		indexSearcher.setHighlightLimit(highlightLimit);
+		indexSearcher.setNumThreads(threads);
 
 		indexSearcher.close();
-		
+
 		System.out.println("End time: " + dateFormatter.format(new Date()));
 		
 		return 0;
