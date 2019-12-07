@@ -69,13 +69,7 @@ class TestSearchIndex {
 
 			// Lowecase should match
 			assertTrue(String.format("Lowecase result was not matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: cookie"));
-			// Camelcase should not match
-			assertFalse(String.format("CamelCase result matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: Cookie"));
-			// Uppercase should not match
-			assertFalse(String.format("Uppercase result matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: COOKIE"));
+					d.get(field).equals("This is sample text that will match the term cookie"));
 		}
 	}
 
@@ -95,13 +89,7 @@ class TestSearchIndex {
 
 			// Camelcase should match
 			assertTrue(String.format("CamelCase results was not matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: Cookie"));
-			// Lowecase should not match
-			assertFalse(String.format("Lowercase result matched found for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: cookie"));
-			// Uppercase should match
-			assertFalse(String.format("Uppercase result matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: COOKIE"));
+					d.get(field).equals("This is sample text that will match the term Cookie"));
 		}
 	}
 
@@ -121,13 +109,7 @@ class TestSearchIndex {
 
 			// Uppercase should match
 			assertTrue(String.format("Uppercase result was not matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: COOKIE"));
-			// Lowecase should not match
-			assertFalse(String.format("Lowercase result matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: cookie"));
-			// Camelcase should not match
-			assertFalse(String.format("CamelCase result matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text that will match the term: Cookie"));
+					d.get(field).equals("This is sample text that will match the term COOKIE"));
 		}
 	}
 
@@ -217,7 +199,7 @@ class TestSearchIndex {
 	}
 	
 	@Test
-	void testSearchPhraseIgnoreFirstWord() throws IOException {
+	void testSearchPhraseIgnoreFirstWordOfDocument() throws IOException {
 		String phrase = "My";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
@@ -230,11 +212,55 @@ class TestSearchIndex {
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
 
-			assertTrue(String.format("Result without a hyphen was matched for phrase/term: %s", phrase),
+			assertTrue(String.format("The first word in the sentence is being matched for the phrase/term: %s", phrase),
 					d.get(field).equals("My sample text where a the first term My is not matched but the second one is"));
 		}
 	}
-	
+
+	@Test
+	void testSearchPhraseIgnoreFirstWordOfSentences() throws IOException {
+		String phrase = "First";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertEquals(0, results.scoreDocs.length,
+				String.format("Incorrect number of results were found for search phrase/term: %s", phrase));
+	}
+
+	@Test
+	void testSearchPhraseDontIgnoreWordAfterCommaLCase() throws IOException {
+		String phrase = "yet";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertEquals(1, results.scoreDocs.length,
+				String.format("Incorrect number of results were found for search phrase/term: %s", phrase));
+
+		for (ScoreDoc sd : results.scoreDocs) {
+			Document d = indexSearcher.searcher.doc(sd.doc);
+
+			assertTrue(String.format("The first word after a comma is not being matched for the phrase/term: %s", phrase),
+					d.get(field).equals("First word of this sentence will not be matched, yet the first word of this sentence will be matched."));
+		}
+	}
+
+	@Test
+	void testSearchPhraseDontIgnoreWordAfterCommaCCase() throws IOException {
+		String phrase = "Yet";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertEquals(1, results.scoreDocs.length,
+				String.format("Incorrect number of results were found for search phrase/term: %s", phrase));
+
+		for (ScoreDoc sd : results.scoreDocs) {
+			Document d = indexSearcher.searcher.doc(sd.doc);
+
+			assertTrue(String.format("The first word after a comma is not being matched for the phrase/term: %s", phrase),
+					d.get(field).equals("First word of this sentence will not be matched, Yet the first word of this sentence will be matched."));
+		}
+	}
+
 	/*
 	 * Ensure that documents are returned in order based on their score
 	 */
@@ -253,7 +279,7 @@ class TestSearchIndex {
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
 
-			assertTrue(String.format("Result without a hyphen was matched for phrase/term: %s", phrase),
+			assertTrue(String.format("Results are not returned based on assigned priority for phrase/term: %s", phrase),
 					d.get("title").startsWith("Test Doc 5 - " + i));
 			
 			i++;
