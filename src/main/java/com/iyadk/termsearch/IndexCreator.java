@@ -8,6 +8,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -17,6 +21,7 @@ import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
 
@@ -67,44 +72,118 @@ public class IndexCreator {
     	BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream), 262144);
 
 		dirIndex = new MMapDirectory(indexPath);
-		IndexWriterConfig writerConfig = new IndexWriterConfig(analyzer);
-		
-		writerConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
-		IndexWriter writer = new IndexWriter(dirIndex, writerConfig);
 
+		// Increase segments per tier to improve indexing performance
+		TieredMergePolicy mergePolicy = new TieredMergePolicy();
+		mergePolicy.setSegmentsPerTier(20);
+		
+		IndexWriterConfig writerConfig = new IndexWriterConfig(analyzer);
+		writerConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+		// Optimization based lucene documentation
+		writerConfig.setUseCompoundFile(false);
+		writerConfig.setMergePolicy(mergePolicy);
+
+		IndexWriter writer = new IndexWriter(dirIndex, writerConfig);
 		IndexSchema schema = new IndexSchema();
 
-        long lineNum = 1;
-        String line;
-        while ((line = bufferedReader.readLine()) != null) {
-        	lineNum++;
-        	
-        	String splitLine[] = line.split(delimeter, 2);
-        	// TODO: Add improved checking for title and content parsing 
-        	if (splitLine.length != 2) {
-        		System.out.printf("Line %d of corpus is not properly formatted: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
-        		continue;
-        	}
+		class ThreadedIndexWriter implements Runnable {
+			private BlockingQueue<String> queue;
 
-        	// Get the document score from the document title
-        	int docScore;
-    		try {
-    			docScore = parseDocumentScore(splitLine[0]);
-			} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
-        		System.out.printf("Unable to parse score from line %d of corpus: " + System.lineSeparator() + "\t%s" + System.lineSeparator(), lineNum, line);
-				continue;
+			ThreadedIndexWriter(BlockingQueue<String> queue) {
+				this.queue = queue;
 			}
 
-    		// Add the document to the index
-        	writer.addDocument(schema.createDocument(splitLine[0], splitLine[1], docScore));
+			@Override
+			public void run() {
+				// Print a brief output every several thousand lines of the corpus on the line number being processed
+				//if ( lineNum % 100000 == 0 ) {
+				//	System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
+				//}
 
-        	// Print a brief output every several thousand lines of the corpus on the line number being processed
-        	if ( lineNum % 100000 == 0 ) {
-        		System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
-        	}
-        }
-        
+				String line;
+
+				while (true) {
+					try {
+						line = queue.take();
+					} catch (InterruptedException e1) {
+						// TODO Auto-generated catch block
+						break;
+					}
+
+					if (line.contentEquals("END OF FILE")) {
+						break;
+					}
+
+					String splitLine[] = line.split(delimeter, 2);
+					// TODO: Add improved checking for title and content parsing
+					if (splitLine.length != 2) {
+						System.out.printf("Line %d of corpus is not properly formatted: " + System.lineSeparator()
+								+ "\t%s" + System.lineSeparator(), 1, line);
+						continue;
+					}
+
+					// Get the document score from the document title
+					int docScore;
+					try {
+						docScore = parseDocumentScore(splitLine[0]);
+					} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
+						System.out.printf("Unable to parse score from line %d of corpus: " + System.lineSeparator()
+								+ "\t%s" + System.lineSeparator(), 1, line);
+						continue;
+					}
+
+					// Add the document to the index
+					try {
+						writer.addDocument(schema.createDocument(splitLine[0], splitLine[1], docScore));
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+	        }
+		}
+
+		BlockingQueue<String> dataQueue = new ArrayBlockingQueue<String>(100000);
+		ExecutorService threadPool = Executors.newFixedThreadPool(5);
+		threadPool.execute(new ThreadedIndexWriter(dataQueue));
+		threadPool.execute(new ThreadedIndexWriter(dataQueue));
+		threadPool.execute(new ThreadedIndexWriter(dataQueue));
+		threadPool.execute(new ThreadedIndexWriter(dataQueue));
+		threadPool.execute(new ThreadedIndexWriter(dataQueue));
+
+		long lineCount = 1;
+		String line;
+		while ((line = bufferedReader.readLine()) != null) {
+			lineCount++;
+			try {
+				dataQueue.put(line);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+
+		// Close the buffers since we don't need them
 	    bufferedReader.close();
+	    fileInputStream.close();
+
+	    // Poison the dataQueue to tell threads to stop
+		try {
+			dataQueue.put("END OF FILE");
+			dataQueue.put("END OF FILE");
+			dataQueue.put("END OF FILE");
+			dataQueue.put("END OF FILE");
+			dataQueue.put("END OF FILE");
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	    // Wait for all thread to termiante
+	    threadPool.shutdown();
+	    while (!threadPool.isTerminated()) { }
+
+	    // Release the index and memory mapped directory
 		writer.close();
 		dirIndex.close();
 	}
