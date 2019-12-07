@@ -31,6 +31,7 @@ public class IndexCreator {
 	private Directory dirIndex;
 	private String delimeter;
 	private Analyzer analyzer;
+	private int numThreads;
 
 	/*
 	 * @param corpusPath Path to the corpus text
@@ -40,6 +41,7 @@ public class IndexCreator {
 		indexPath = Paths.get("./lucene-index");
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
 		delimeter = ".txt:";
+		numThreads=4;
 	}
 	
 	public IndexCreator(String corpus, String index) throws IOException {
@@ -55,6 +57,14 @@ public class IndexCreator {
 		this.delimeter = delimeter;
 	}
 	
+	public int getNumThreads() {
+		return numThreads;
+	}
+
+	public void setNumThreads(int numThreads) {
+		this.numThreads = numThreads;
+	}
+
 	/*
 	 * Retrieves the score to assign to the document
 	 * 
@@ -144,18 +154,18 @@ public class IndexCreator {
 		}
 
 		BlockingQueue<String> dataQueue = new ArrayBlockingQueue<String>(100000);
-		ExecutorService threadPool = Executors.newFixedThreadPool(5);
-		threadPool.execute(new ThreadedIndexWriter(dataQueue));
-		threadPool.execute(new ThreadedIndexWriter(dataQueue));
-		threadPool.execute(new ThreadedIndexWriter(dataQueue));
-		threadPool.execute(new ThreadedIndexWriter(dataQueue));
-		threadPool.execute(new ThreadedIndexWriter(dataQueue));
+		ExecutorService threadPool = Executors.newFixedThreadPool(numThreads);
+		// Spawn the thread pool of consumers
+		for(int i=0; i < numThreads; i++) {
+			threadPool.execute(new ThreadedIndexWriter(dataQueue));
+		}
 
 		long lineCount = 1;
 		String line;
 		while ((line = bufferedReader.readLine()) != null) {
 			lineCount++;
 			try {
+				// Add lines read from the file to the queue
 				dataQueue.put(line);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
@@ -169,17 +179,15 @@ public class IndexCreator {
 
 	    // Poison the dataQueue to tell threads to stop
 		try {
-			dataQueue.put("END OF FILE");
-			dataQueue.put("END OF FILE");
-			dataQueue.put("END OF FILE");
-			dataQueue.put("END OF FILE");
-			dataQueue.put("END OF FILE");
+			for(int i=0; i < numThreads; i++) {
+				dataQueue.put("END OF FILE");
+			}
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
-	    // Wait for all thread to termiante
+	    // Wait for all thread to terminate
 	    threadPool.shutdown();
 	    while (!threadPool.isTerminated()) { }
 

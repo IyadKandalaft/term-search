@@ -24,6 +24,11 @@ public class IndexCommand implements Callable<Integer> {
 			description="Delimeter (regex) to use to split corpus lines into document titles and content",
 			defaultValue=".txt:")
 	private String delimeter;
+	
+	@Option(names={"-t", "--threads"},
+			description="Number of threads/cores to use for indexing",
+			defaultValue="4")
+	private int threads;
 
 	public Integer call() throws Exception {
 		System.out.println("Creating index");
@@ -36,11 +41,13 @@ public class IndexCommand implements Callable<Integer> {
 		IndexCreator indexCreator = new IndexCreator(corpusFile, indexDir);
 		
 		indexCreator.setDelimeter(delimeter);
+		indexCreator.setNumThreads(threads);
 
 		try {
 			indexCreator.create();
 		} catch (FileNotFoundException e) {
 			System.out.printf("The corpus file %s does not exist.", corpusFile);
+			return 1;
 		}
 
 		System.out.println("End time: " + dateFormatter.format(new Date()));
