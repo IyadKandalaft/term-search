@@ -7,7 +7,7 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 /*
- * Filters out the first word of a token stream.
+ * Filters out the first word of every sentence in the document
  */
 public final class FirstWordFilter extends TokenFilter {
 	private CharTermAttribute charTermAttr;
@@ -18,22 +18,21 @@ public final class FirstWordFilter extends TokenFilter {
 		this.charTermAttr = addAttribute(CharTermAttribute.class);
 	}
 
-	  @Override
-	  public boolean incrementToken() throws IOException {
-	    if (!input.incrementToken()) {
-	      return false;
-	    }
+	@Override
+	public boolean incrementToken() throws IOException {
+		if (!input.incrementToken()) {
+			return false;
+		}
+		if (!firstWord) {
+			return true;
+		}
 
-	    if (! firstWord ) {
-	    	return true;
-	    }
-	    
-	    charTermAttr.setEmpty();
-	    charTermAttr.append("");
-	    firstWord = false;
-	    
-	    return true;
-	  }
+		charTermAttr.setEmpty();
+		charTermAttr.append("");
+		firstWord = false;
+
+		return true;
+	}
 
 	@Override
 	public void reset() throws IOException {
