@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.EnumMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -32,6 +33,9 @@ public class IndexCreator {
 	private String delimeter;
 	private Analyzer analyzer;
 	private int numThreads;
+	private static enum qKeys {
+		LINE, LINEID
+	}
 
 	/*
 	 * @param corpusPath Path to the corpus text
@@ -78,8 +82,8 @@ public class IndexCreator {
 	}
 	
 	public void create() throws FileNotFoundException, IOException{
-    	InputStream fileInputStream = new FileInputStream(corpusPath.toFile());
-    	BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream), 262144);
+		InputStream fileInputStream = new FileInputStream(corpusPath.toFile());
+		BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream), 262144);
 
 		dirIndex = new MMapDirectory(indexPath);
 
@@ -97,26 +101,24 @@ public class IndexCreator {
 		IndexSchema schema = new IndexSchema();
 
 		class ThreadedIndexWriter implements Runnable {
-			private BlockingQueue<String> queue;
+			private BlockingQueue<EnumMap<qKeys,String>> queue;
 
-			ThreadedIndexWriter(BlockingQueue<String> queue) {
+			ThreadedIndexWriter(BlockingQueue<EnumMap<qKeys,String>> queue) {
 				this.queue = queue;
 			}
 
 			@Override
 			public void run() {
-				// Print a brief output every several thousand lines of the corpus on the line number being processed
-				//if ( lineNum % 100000 == 0 ) {
-				//	System.out.printf("Processing line %d" + System.lineSeparator(), lineNum);
-				//}
-
-				String line;
-
 				while (true) {
+					String line;
+					String lineId;
+					EnumMap<qKeys,String> queueItem;
+
 					try {
-						line = queue.take();
+						queueItem = queue.take();
+						line = queueItem.get(qKeys.LINE);
+						lineId = queueItem.get(qKeys.LINEID);
 					} catch (InterruptedException e1) {
-						// TODO Auto-generated catch block
 						break;
 					}
 
@@ -124,11 +126,15 @@ public class IndexCreator {
 						break;
 					}
 
+					// Print progress for every 100000 queue items
+					if ( (Integer.parseInt(lineId) % 100000) == 0 ) {
+						System.out.printf("Processing line %s" + System.lineSeparator(), lineId);
+					}
+
 					String splitLine[] = line.split(delimeter, 2);
-					// TODO: Add improved checking for title and content parsing
 					if (splitLine.length != 2) {
-						System.out.printf("Line %d of corpus is not properly formatted: " + System.lineSeparator()
-								+ "\t%s" + System.lineSeparator(), 1, line);
+						System.out.printf("Line %s of corpus is not properly formatted: " + System.lineSeparator()
+								+ "\t%s" + System.lineSeparator(), lineId, line.substring(0,Math.min(line.length(), 100)));
 						continue;
 					}
 
@@ -137,8 +143,8 @@ public class IndexCreator {
 					try {
 						docScore = parseDocumentScore(splitLine[0]);
 					} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
-						System.out.printf("Unable to parse score from line %d of corpus: " + System.lineSeparator()
-								+ "\t%s" + System.lineSeparator(), 1, line);
+						System.out.printf("Unable to parse score from line %s of corpus: " + System.lineSeparator()
+								+ "\t%s" + System.lineSeparator(), lineId, line.substring(0,Math.min(line.length(), 100)));
 						continue;
 					}
 
@@ -153,24 +159,38 @@ public class IndexCreator {
 	        }
 		}
 
-		BlockingQueue<String> dataQueue = new ArrayBlockingQueue<String>(100000);
+		// Create a queue to receive lines from the file that will be consumed by the threads
+		BlockingQueue<EnumMap<qKeys, String>> dataQueue = new ArrayBlockingQueue<>(10000);
+
+		// Spawn the thread pool of consumers for the queue
 		ExecutorService threadPool = Executors.newFixedThreadPool(numThreads);
-		// Spawn the thread pool of consumers
 		for(int i=0; i < numThreads; i++) {
 			threadPool.execute(new ThreadedIndexWriter(dataQueue));
 		}
 
+		// Read the file byte by byte to parse out lines based on \n
+		// This ignores \r characters since the corpus can be malformed
+		StringBuilder line = new StringBuilder(4096);
 		long lineCount = 1;
-		String line;
-		while ((line = bufferedReader.readLine()) != null) {
-			lineCount++;
-			try {
-				// Add lines read from the file to the queue
-				dataQueue.put(line);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+		int currentChar;
+		while((currentChar = bufferedReader.read()) > -1) {
+			if (currentChar == '\n') {
+				// Create a queue item containing the line and the line count
+				EnumMap<qKeys,String> queueItem = new EnumMap<>(qKeys.class);
+				queueItem.put(qKeys.LINE, line.toString());
+				queueItem.put(qKeys.LINEID, Long.toString(lineCount++));
+				try {
+					dataQueue.put(queueItem);
+				} catch (InterruptedException e) {
+					break;
+				}
+
+				// Clear the line to prepare to read a new line
+				line = new StringBuilder(4096);
+				continue;
 			}
+
+			line.append((char)currentChar);
 		}
 
 		// Close the buffers since we don't need them
@@ -178,13 +198,16 @@ public class IndexCreator {
 	    fileInputStream.close();
 
 	    // Poison the dataQueue to tell threads to stop
+	    // There must be one poison pill per thread
+		EnumMap<qKeys,String> poisonPill = new EnumMap<>(qKeys.class);
+		poisonPill.put(qKeys.LINE, "END OF FILE");
+		poisonPill.put(qKeys.LINEID, "");
 		try {
 			for(int i=0; i < numThreads; i++) {
-				dataQueue.put("END OF FILE");
+				dataQueue.put(poisonPill);
 			}
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.out.println("Unable to add poison pills to queue.");
 		}
 
 	    // Wait for all thread to terminate
