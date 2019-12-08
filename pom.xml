@@ -5,6 +5,11 @@
   <version>0.0.1-SNAPSHOT</version>
   <name>Term Search</name>
   <description>A simple CLI that searches for millions of terms in a large corpus using a minimal set of technologies in an efficient manner</description>
+  <scm>
+    <connection>scm:git:https://github.com/IyadKandalaft/term-search</connection>
+    <developerConnection>scm:git:https://github.com/IyadKandalaft/term-search</developerConnection>
+    <url>https://github.com/IyadKandalaft/term-search</url>
+  </scm>
   <dependencies>
   	<dependency>
   		<groupId>org.apache.lucene</groupId>
