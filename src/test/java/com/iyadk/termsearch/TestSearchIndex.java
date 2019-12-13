@@ -1,9 +1,9 @@
 package com.iyadk.termsearch;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.File;
 import java.io.IOException;
@@ -13,25 +13,25 @@ import java.nio.file.Paths;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
-class TestSearchIndex {
 
-	String indexDir;
-	String termsFile;
-	SearchIndex indexSearcher;
+public class TestSearchIndex {
+	private static String indexDir;
+	private static String termsFile;
+	private static SearchIndex indexSearcher;
 
 	// Field to search for most tests
 	String field = "content";
 	
-	@BeforeEach
-	void setUp() throws Exception {
+	@BeforeClass
+	public static void setUp() throws Exception {
 		indexDir = Files.createTempDirectory("lucene-index-test").toString();
 
-		String corpusFile = getClass().getClassLoader().getResource("test-corpus.txt").getFile().toString();
-		termsFile = getClass().getClassLoader().getResource("test-terms.txt").getFile().toString();
+		String corpusFile = TestSearchIndex.class.getClassLoader().getResource("test-corpus.txt").getFile().toString();
+		termsFile = TestSearchIndex.class.getClassLoader().getResource("test-terms.txt").getFile().toString();
 
 		/*
 		 * Create a known index from the test-courpus.txt resource
@@ -40,7 +40,7 @@ class TestSearchIndex {
 		indexCreator.create();
 
 		File outputFile = Paths.get("./output.tsv").toFile();
-
+		System.out.println("Creating index");
 		try {
 			indexSearcher = new SearchIndex(termsFile, outputFile.toString(), indexDir);
 		} catch (IOException e) {
@@ -48,21 +48,24 @@ class TestSearchIndex {
 		}
 	}
 
-	@AfterEach
-	void tearDown() throws Exception {
-
+	@AfterClass
+	public static void tearDown() throws Exception {
+		System.out.println("Deleting index");
+		Files.deleteIfExists(Paths.get(indexDir));
 	}
 
 	@Test
-	void testSearchTermLCase() throws IOException {
+	public void testSearchTermLCase() throws IOException {
 		String phrase = "cookie";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
-		assertEquals(1, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
+				
+		assertEquals(String.format("Incorrect number of results were found for search phrase: %s", phrase),
+				1, results.scoreDocs.length);
+				
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -74,15 +77,17 @@ class TestSearchIndex {
 	}
 
 	@Test
-	void testSearchTermCCase() throws IOException {
+	public void testSearchTermCCase() throws IOException {
 		String phrase = "Cookie";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
-		assertEquals(1, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
+				
+		assertEquals(String.format("Incorrect number of results were found for search phrase: %s", phrase),
+				1, results.scoreDocs.length);
+				
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -94,15 +99,15 @@ class TestSearchIndex {
 	}
 
 	@Test
-	void testSearchTermUCase() throws IOException {
+	public void testSearchTermUCase() throws IOException {
 		String phrase = "COOKIE";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
-		assertEquals(1, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase), 
+				0, results.scoreDocs.length);
+		assertEquals(String.format("Incorrect number of results were found for search phrase: %s", phrase),
+				1, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -114,15 +119,15 @@ class TestSearchIndex {
 	}
 
 	@Test
-	void testSearchPhraseLCase() throws IOException {
+	public void testSearchPhraseLCase() throws IOException {
 		String phrase = "two words";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
-		assertEquals(1, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
+		assertEquals(String.format("Incorrect number of results were found for search phrase: %s", phrase),
+				1, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -135,15 +140,15 @@ class TestSearchIndex {
 	}
 
 	@Test
-	void testSearchPhraseUCase() throws IOException {
+	public void testSearchPhraseUCase() throws IOException {
 		String phrase = "Two Words";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
-		assertEquals(1, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
+		assertEquals(String.format("Incorrect number of results were found for search phrase: %s", phrase),
+				1, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -156,16 +161,16 @@ class TestSearchIndex {
 	}
 
 	@Test
-	void testSearchInsideQuotes() throws IOException {
+	public void testSearchInsideQuotes() throws IOException {
 		String phrase = "quote";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
 
-		assertEquals(3, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+		assertEquals(String.format("Incorrect number of results were found for search phrase: %s", phrase),
+				3, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -179,13 +184,13 @@ class TestSearchIndex {
 	}
 
 	@Test
-	void testSearchPhraseHyphen() throws IOException {
+	public void testSearchPhraseHyphen() throws IOException {
 		String phrase = "hyphen";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
 		assertTrue(String.format("More than two results were found for search phrase: %s", phrase),
 				(results.scoreDocs.length < 3));
 
@@ -199,15 +204,15 @@ class TestSearchIndex {
 	}
 	
 	@Test
-	void testSearchPhraseIgnoreFirstWordOfDocument() throws IOException {
+	public void testSearchPhraseIgnoreFirstWordOfDocument() throws IOException {
 		String phrase = "My";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
-		assertEquals(1, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+				1, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -218,23 +223,23 @@ class TestSearchIndex {
 	}
 
 	@Test
-	void testSearchPhraseIgnoreFirstWordOfSentences() throws IOException {
+	public void testSearchPhraseIgnoreFirstWordOfSentences() throws IOException {
 		String phrase = "First";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertEquals(0, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase/term: %s", phrase));
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
 	}
 
 	@Test
-	void testSearchPhraseDontIgnoreWordAfterCommaLCase() throws IOException {
+	public void testSearchPhraseDontIgnoreWordAfterCommaLCase() throws IOException {
 		String phrase = "yet";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertEquals(1, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase/term: %s", phrase));
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+				1, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -245,13 +250,13 @@ class TestSearchIndex {
 	}
 
 	@Test
-	void testSearchPhraseDontIgnoreWordAfterCommaCCase() throws IOException {
+	public void testSearchPhraseDontIgnoreWordAfterCommaCCase() throws IOException {
 		String phrase = "Yet";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertEquals(1, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase/term: %s", phrase));
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase), 
+				1, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
@@ -265,15 +270,15 @@ class TestSearchIndex {
 	 * Ensure that documents are returned in order based on their score
 	 */
 	@Test
-	void testSearchPhraseDocumentPriority() throws IOException {
+	public void testSearchPhraseDocumentPriority() throws IOException {
 		String phrase = "priority";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(0, results.scoreDocs.length,
-				String.format("No results found for search phrase/term: %s", phrase));
-		assertEquals(5, results.scoreDocs.length,
-				String.format("Incorrect number of results were found for search phrase: %s", phrase));
+		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
+		assertEquals(String.format("Incorrect number of results were found for search phrase: %s", phrase),
+				5, results.scoreDocs.length);
 
 		int i = 1;
 		for (ScoreDoc sd : results.scoreDocs) {
