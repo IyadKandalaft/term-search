@@ -45,7 +45,7 @@ public class IndexCreator {
 		indexPath = Paths.get("./lucene-index");
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
 		delimeter = ".txt:";
-		numThreads=4;
+		numThreads=1;
 	}
 	
 	public IndexCreator(String corpus, String index) throws IOException {
@@ -69,13 +69,13 @@ public class IndexCreator {
 		this.numThreads = numThreads;
 	}
 
-	/*
+	/**
 	 * Retrieves the score to assign to the document
 	 * 
 	 * This is retrieved from the title using a position. A regex might be
 	 * appropriate but can negatively impact performance.
 	 * 
-	 *  @param documentTitle Document title containing the document score to parse
+	 * @param documentTitle Document title containing the document score to parse
 	 */
 	public int parseDocumentScore(String documentTitle) throws NumberFormatException, StringIndexOutOfBoundsException {
 		return Integer.parseInt(documentTitle.substring(documentTitle.length() - 1, documentTitle.length()));
@@ -83,7 +83,8 @@ public class IndexCreator {
 	
 	public void create() throws FileNotFoundException, IOException{
 		InputStream fileInputStream = new FileInputStream(corpusPath.toFile());
-		BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(fileInputStream), 262144);
+		InputStreamReader fileInputStreamReader = new InputStreamReader(fileInputStream);
+		BufferedReader bufferedReader = new BufferedReader(fileInputStreamReader, 262144);
 
 		dirIndex = new MMapDirectory(indexPath);
 
@@ -176,15 +177,7 @@ public class IndexCreator {
 		while((currentChar = bufferedReader.read()) > -1) {
 			if (currentChar == '\n') {
 				// Create a queue item containing the line and the line count
-				EnumMap<qKeys,String> queueItem = new EnumMap<>(qKeys.class);
-				queueItem.put(qKeys.LINE, line.toString());
-				queueItem.put(qKeys.LINEID, Long.toString(lineCount++));
-				try {
-					dataQueue.put(queueItem);
-				} catch (InterruptedException e) {
-					break;
-				}
-
+				addItemToQueue(line, lineCount, dataQueue);
 				// Clear the line to prepare to read a new line
 				line = new StringBuilder(4096);
 				continue;
@@ -192,6 +185,8 @@ public class IndexCreator {
 
 			line.append((char)currentChar);
 		}
+		// Add the last line to the queue because it might not be terminated by \n
+		addItemToQueue(line, lineCount, dataQueue);
 
 		// Close the buffers since we don't need them
 	    bufferedReader.close();
@@ -218,7 +213,25 @@ public class IndexCreator {
 		writer.close();
 		dirIndex.close();
 	}
-	
+
+	/**
+	 * Convenience method to add a line and its number to a queue
+	 * @param line The StringBuilder string to be added to the queue
+	 * @param lineNum The number of the line being added 
+	 * @param queue The queue to add the item to
+	 */
+	private void addItemToQueue(StringBuilder line, long lineNum, BlockingQueue<EnumMap<qKeys, String>> queue) {
+		EnumMap<qKeys,String> queueItem = new EnumMap<>(qKeys.class);
+		queueItem.put(qKeys.LINE, line.toString());
+		queueItem.put(qKeys.LINEID, Long.toString(lineNum++));
+
+		try {
+			queue.put(queueItem);
+		} catch (InterruptedException e) {
+			System.out.println("Failed to add an item to the queue");
+		}
+	}
+
 	private class IndexSchema{
 		private FieldType titleField;
 		private FieldType contentField;
@@ -237,7 +250,7 @@ public class IndexCreator {
 			titleField.setStored( true );
 			titleField.setTokenized( false );
 			titleField.freeze();
-			
+
 			contentField = new FieldType();
 			contentField.setIndexOptions( IndexOptions.DOCS_AND_FREQS_AND_POSITIONS );
 			contentField.setStoreTermVectors( true );

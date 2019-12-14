@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import org.apache.lucene.document.Document;
@@ -46,12 +47,15 @@ public class TestSearchIndex {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+
+		System.out.println("Running tests...");
+
 	}
 
 	@AfterClass
 	public static void tearDown() throws Exception {
 		System.out.println("Deleting index");
-		Files.deleteIfExists(Paths.get(indexDir));
+		Files.walk(Paths.get(indexDir)).map(Path::toFile).forEach(File::delete);
 	}
 
 	@Test
@@ -184,7 +188,7 @@ public class TestSearchIndex {
 	}
 
 	@Test
-	public void testSearchPhraseHyphen() throws IOException {
+	public void testSearchTermHyphen() throws IOException {
 		String phrase = "hyphen";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
@@ -204,7 +208,7 @@ public class TestSearchIndex {
 	}
 	
 	@Test
-	public void testSearchPhraseIgnoreFirstWordOfDocument() throws IOException {
+	public void testSearchTermIgnoreFirstInDocument() throws IOException {
 		String phrase = "My";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
@@ -223,7 +227,7 @@ public class TestSearchIndex {
 	}
 
 	@Test
-	public void testSearchPhraseIgnoreFirstWordOfSentences() throws IOException {
+	public void testSearchTermIgnoreFirstInSentences() throws IOException {
 		String phrase = "First";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
@@ -233,7 +237,17 @@ public class TestSearchIndex {
 	}
 
 	@Test
-	public void testSearchPhraseDontIgnoreWordAfterCommaLCase() throws IOException {
+	public void testSearchTermIgnoreFirstLongDoc() throws IOException {
+		String phrase = "Undoubtedly";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
+	}
+
+	@Test
+	public void testSearchTermMatchAfterCommaLCase() throws IOException {
 		String phrase = "yet";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
@@ -250,7 +264,7 @@ public class TestSearchIndex {
 	}
 
 	@Test
-	public void testSearchPhraseDontIgnoreWordAfterCommaCCase() throws IOException {
+	public void testSearchTermMatchWordAfterCommaCCase() throws IOException {
 		String phrase = "Yet";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
