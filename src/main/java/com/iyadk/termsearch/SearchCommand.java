@@ -13,43 +13,48 @@ import picocli.CommandLine.Option;
 @Command(name = "search")
 public class SearchCommand implements Callable<Integer> {
 	@Option(names={"-i", "--index", "--index-path"}, 
-			description="Path to read the index from", 
+			description="Path to read the index from (default: ${DEFAULT-VALUE})", 
 			defaultValue = "./lucene-index",
 			paramLabel="INDEXPATH")
 	private String indexDir;
 	
 	@Option(names={"-t", "--terms", "--search-terms-path"}, 
-			description="Path to the terms file to query for", 
+			description="Path to file containing terms to query (default: ${DEFAULT-VALUE})", 
 			defaultValue = "./terms.txt",
 			paramLabel="FILE")
 	private String termsFile;
 
 	@Option(names={"-o", "--output", "--output-file"},
-			description="Path to the file where the output will be written",
+			description="Path to the file where the output will be written (default: ${DEFAULT-VALUE})",
 			defaultValue="./output/results.tsv",
 			paramLabel="FILE")
 	private String outputFile;
 	
 	@Option(names={"-m", "--match-limit"},
-			description="Maximum number of matches to return",
+			description="Maximum number of matches to return (default: ${DEFAULT-VALUE})",
 			defaultValue="100",
 			type=Integer.class, 
 			paramLabel="NUM")
 	private Integer matchLimit;
 	
-	@Option(names={"-h", "--highlight-limit"},
-			description="Maximum number of characters to return surrounding a matched term",
+	@Option(names={"-l", "--highlight-limit"},
+			description="Maximum number of characters to return surrounding a matched term (default: ${DEFAULT-VALUE})",
 			defaultValue="500",
-			type=Integer.class, 
+			type=Integer.class,
 			paramLabel="NUM")
 	private Integer highlightLimit;
 	
 	@Option(names={"--threads"},
-			description="Number of threads/cores to use for searching",
+			description="Number of threads/cores to use for searching (default: ${DEFAULT-VALUE})",
 			defaultValue="4",
-			type=Integer.class, 
+			type=Integer.class,
 			paramLabel="NUM")
 	private Integer threads;
+	
+    @Option(names = { "-h", "--help" },
+    		usageHelp = true,
+    		description = "Displays this message")
+    private boolean helpRequested = false;
 	
 	public Integer call() throws Exception {
 		System.out.println("Executing search command");

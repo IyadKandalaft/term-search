@@ -11,24 +11,29 @@ import picocli.CommandLine.Option;
 @Command(name = "index")
 public class IndexCommand implements Callable<Integer> {
 	@Option(names={"-f", "--corpus"}, 
-			description="Path to the Corpus text to index", 
+			description="Path to the Corpus text to index ", 
 			required=true)
 	private String corpusFile;
 	
 	@Option(names={"-i", "--index", "--index-path"}, 
-			description="Path to create the index in", 
+			description="Path to create the index in (default: ${DEFAULT-VALUE})", 
 			defaultValue="./lucene-index")
 	private String indexDir;
 	
 	@Option(names={"-d", "--delimeter"},
-			description="Delimeter (regex) to use to split corpus lines into document titles and content",
+			description="Delimeter (regex) used to split corpus lines into document titles and content (default: ${DEFAULT-VALUE})",
 			defaultValue=".txt:")
 	private String delimeter;
 	
 	@Option(names={"--threads"},
-			description="Number of threads/cores to use for indexing",
+			description="Number of threads/cores to use for indexing (default: ${DEFAULT-VALUE})",
 			defaultValue="4")
 	private int threads;
+
+    @Option(names = { "-h", "--help" },
+    		usageHelp = true,
+    		description = "Displays this message")
+    private boolean helpRequested = false;
 
 	public Integer call() throws Exception {
 		System.out.println("Creating index");
