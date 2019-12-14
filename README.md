@@ -1,3 +1,4 @@
+[![CircleCI](https://circleci.com/gh/IyadKandalaft/term-search/tree/dev.svg?style=svg)](https://circleci.com/gh/IyadKandalaft/term-search/tree/dev)
 # Term Search
 
 A simple CLI that searches for millions of terms in a large corpus using a minimal set of technologies in an efficient manner.
