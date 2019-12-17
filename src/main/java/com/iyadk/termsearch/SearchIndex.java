@@ -185,7 +185,7 @@ public class SearchIndex {
 								}
 
 								bufferedWriter
-										.write(searchString + "\t" + d.get("title") + "\t" + fragment + lnSeperator);
+										.write(searchString + "\t" + fragment + "\t" + d.get("title") + lnSeperator);
 							}
 
 							System.out.print("Searching for: " + searchString + lnSeperator + "Total Results: "

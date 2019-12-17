@@ -9,10 +9,14 @@ import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.EnumMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -33,6 +37,9 @@ public class IndexCreator {
 	private String delimeter;
 	private Analyzer analyzer;
 	private int numThreads;
+	private List<Pattern> scoreOffsetPatterns;
+	private List<Float> scoreOffsetValues;
+	
 	private static enum qKeys {
 		LINE, LINEID
 	}
@@ -46,6 +53,8 @@ public class IndexCreator {
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
 		delimeter = ".txt:";
 		numThreads=1;
+		scoreOffsetPatterns = new LinkedList<>();
+		scoreOffsetValues = new LinkedList<>();
 	}
 	
 	public IndexCreator(String corpus, String index) throws IOException {
@@ -67,6 +76,26 @@ public class IndexCreator {
 
 	public void setNumThreads(int numThreads) {
 		this.numThreads = numThreads;
+	}
+	
+	public void setOffsetLookup(String offsetLookupFile) throws IOException, FileNotFoundException, PatternSyntaxException, NumberFormatException {
+		InputStream fileInputStream = new FileInputStream(Paths.get(offsetLookupFile).toFile());
+		InputStreamReader fileInputStreamReader = new InputStreamReader(fileInputStream);
+		BufferedReader bufferedReader = new BufferedReader(fileInputStreamReader, 262144);
+		
+		String line;
+		while ( (line = bufferedReader.readLine()) != null ){
+			String[] lineParts = line.split("\t");
+			if (lineParts.length != 2 ) {
+				continue;
+			}			
+			scoreOffsetPatterns.add(Pattern.compile(lineParts[0]));
+			scoreOffsetValues.add(Float.parseFloat(lineParts[1]));
+		}
+
+		bufferedReader.close();
+		fileInputStream.close();
+		fileInputStream.close();
 	}
 
 	/**
@@ -128,30 +157,39 @@ public class IndexCreator {
 					}
 
 					// Print progress for every 100000 queue items
-					if ( (Integer.parseInt(lineId) % 100000) == 0 ) {
+					if ( lineId.endsWith("00000") ) {
 						System.out.printf("Processing line %s" + System.lineSeparator(), lineId);
 					}
 
 					String splitLine[] = line.split(delimeter, 2);
-					if (splitLine.length != 2) {
+					if (splitLine.length < 2) {
 						System.out.printf("Line %s of corpus is not properly formatted: " + System.lineSeparator()
 								+ "\t%s" + System.lineSeparator(), lineId, line.substring(0,Math.min(line.length(), 100)));
 						continue;
 					}
 
+					String docTitle = splitLine[0];
+					String docContent = splitLine[1];
+					
 					// Get the document score from the document title
 					int docScore;
 					try {
-						docScore = parseDocumentScore(splitLine[0]);
+						docScore = parseDocumentScore(docTitle);
 					} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
 						System.out.printf("Unable to parse score from line %s of corpus: " + System.lineSeparator()
 								+ "\t%s" + System.lineSeparator(), lineId, line.substring(0,Math.min(line.length(), 100)));
 						continue;
 					}
+					
+					for(int i = 0; i < scoreOffsetPatterns.size(); i++) {
+						if ( scoreOffsetPatterns.get(i).matcher(docTitle).find() ) {
+							docScore = (int)(docScore * scoreOffsetValues.get(i) * 1000);
+						}
+					}
 
 					// Add the document to the index
 					try {
-						writer.addDocument(schema.createDocument(splitLine[0], splitLine[1], docScore));
+						writer.addDocument(schema.createDocument(docTitle, docContent, docScore));
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -180,6 +218,7 @@ public class IndexCreator {
 				addItemToQueue(line, lineCount, dataQueue);
 				// Clear the line to prepare to read a new line
 				line = new StringBuilder(4096);
+				lineCount++;
 				continue;
 			}
 

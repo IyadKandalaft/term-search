@@ -4,6 +4,7 @@ import java.io.FileNotFoundException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.Callable;
+import java.util.regex.PatternSyntaxException;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -25,6 +26,11 @@ public class IndexCommand implements Callable<Integer> {
 			defaultValue=".txt:")
 	private String delimeter;
 	
+	@Option(names={"-s", "--score-offset"},
+			description="TSV file w/ 2 columns containing a regex and a multiplying factor that offsets document scores that match the regex"
+			)
+	private String offsetLookupFile;
+	
 	@Option(names={"--threads"},
 			description="Number of threads/cores to use for indexing (default: ${DEFAULT-VALUE})",
 			defaultValue="4")
@@ -40,14 +46,29 @@ public class IndexCommand implements Callable<Integer> {
 
 		SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
-		System.out.println("Start time: " + dateFormatter.format(new Date()));
-		System.out.println("-------------------------------------------------------");
-
 		IndexCreator indexCreator = new IndexCreator(corpusFile, indexDir);
 		
 		indexCreator.setDelimeter(delimeter);
 		indexCreator.setNumThreads(threads);
+		try {
+			if (offsetLookupFile != null ) {
+				System.out.println("Parsing score offset file.");
+				indexCreator.setOffsetLookup(offsetLookupFile);
+			}
+		} catch (FileNotFoundException e) {
+			System.out.printf("The offset lookup file %s does not exist.", offsetLookupFile);
+			return 1;
+		} catch (PatternSyntaxException e) {
+			System.out.printf("The offset lookup file contains an invalid regex.\n %s", e);
+			return 1;
+		} catch (NumberFormatException e) {
+			System.out.printf("The offset lookup file contains an invalid score offset.\n %s", e);
+			return 1;
+		}
 
+		System.out.println("Start time: " + dateFormatter.format(new Date()));
+		System.out.println("-------------------------------------------------------");
+		
 		try {
 			indexCreator.create();
 		} catch (FileNotFoundException e) {

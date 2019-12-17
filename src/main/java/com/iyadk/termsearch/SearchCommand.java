@@ -65,10 +65,12 @@ public class SearchCommand implements Callable<Integer> {
 		System.out.println("-------------------------------------------------------");
 		
 		SearchIndex indexSearcher = new SearchIndex(termsFile, outputFile);
-		indexSearcher.searchAll("content");
+		
 		indexSearcher.setSearchLimit(matchLimit);
 		indexSearcher.setHighlightLimit(highlightLimit);
 		indexSearcher.setNumThreads(threads);
+		
+		indexSearcher.searchAll("content");
 
 		indexSearcher.close();
 
