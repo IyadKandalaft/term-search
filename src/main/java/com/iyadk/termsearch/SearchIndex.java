@@ -66,7 +66,7 @@ public class SearchIndex {
 	 *
 	 * @param output Path to output file where results are written
 	 */
-	public SearchIndex(String terms, String output) throws IOException, NoSuchMethodException {
+	public SearchIndex(String terms, String output) throws IOException {
 		this(terms, output, "./lucene-index");
 	}
 
@@ -77,7 +77,7 @@ public class SearchIndex {
 	 *
 	 * @param index Path to lucene index directory
 	 */
-	public SearchIndex(String terms, String output, String index) throws IOException, NoSuchMethodException, SecurityException {
+	public SearchIndex(String terms, String output, String index) throws IOException {
 		termsPath = Paths.get(terms);
 		outputPath = Paths.get(output);
 		indexPath = Paths.get(index);
@@ -89,6 +89,10 @@ public class SearchIndex {
 		formatter = new SimpleHTMLFormatter("[ ", " ]");
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
 
+		setScoring();
+	}
+
+	private void setScoring() {
 		// Configure scoring of matched documents by dividing the computed "_score"
 		// by the value of the "score" field associated with the indexed document
 		try {
@@ -107,7 +111,7 @@ public class SearchIndex {
 			bindings.add(new SortField("score", SortField.Type.DOUBLE));
 
 			scoringMethod = expr.getDoubleValuesSource(bindings);
-		} catch (ParseException e) {
+		} catch (ParseException | NoSuchMethodException | SecurityException e) {
 			e.printStackTrace();
 		}
 	}
@@ -148,6 +152,7 @@ public class SearchIndex {
 	 */
 	public void setDemoteDocs(boolean demoteDocs) {
 		this.demoteDocs = demoteDocs;
+		setScoring();
 	}
 	
 	/*
