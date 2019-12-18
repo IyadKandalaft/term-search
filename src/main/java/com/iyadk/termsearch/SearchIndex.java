@@ -5,11 +5,13 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.ParseException;
+import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -44,6 +46,7 @@ public class SearchIndex {
 	private int highlightLimit = 500;
 	DoubleValuesSource scoringMethod;
 	private int numThreads = 4;
+	private boolean demoteDocs = false;
 
 	private Directory dirIndex;
 	private IndexReader reader;
@@ -54,7 +57,7 @@ public class SearchIndex {
 	/*
 	 * @param terms Path to file with each search phrase/term per line
 	 */
-	public SearchIndex(String terms) throws IOException {
+	public SearchIndex(String terms) throws IOException, NoSuchMethodException {
 		this(terms, "output.tsv");
 	}
 
@@ -63,7 +66,7 @@ public class SearchIndex {
 	 *
 	 * @param output Path to output file where results are written
 	 */
-	public SearchIndex(String terms, String output) throws IOException {
+	public SearchIndex(String terms, String output) throws IOException, NoSuchMethodException {
 		this(terms, output, "./lucene-index");
 	}
 
@@ -74,7 +77,7 @@ public class SearchIndex {
 	 *
 	 * @param index Path to lucene index directory
 	 */
-	public SearchIndex(String terms, String output, String index) throws IOException {
+	public SearchIndex(String terms, String output, String index) throws IOException, NoSuchMethodException, SecurityException {
 		termsPath = Paths.get(terms);
 		outputPath = Paths.get(output);
 		indexPath = Paths.get(index);
@@ -89,10 +92,20 @@ public class SearchIndex {
 		// Configure scoring of matched documents by dividing the computed "_score"
 		// by the value of the "score" field associated with the indexed document
 		try {
-			Expression expr = JavascriptCompiler.compile("_score / score");
+			HashMap<String,Method> functions = new HashMap<>();
+			functions.putAll(JavascriptCompiler.DEFAULT_FUNCTIONS);
+			functions.put("incrementDocMatchCount", SearchDocumentMatches.class.getMethod("incrementDocMatchCount", double.class));
+
+			Expression expr = JavascriptCompiler.compile("_score / score", functions, getClass().getClassLoader());
+			if (demoteDocs) {
+				expr = JavascriptCompiler.compile("_score / (score + incrementDocMatchCount(docid))", functions, getClass().getClassLoader());
+			}
+
 			SimpleBindings bindings = new SimpleBindings();
+			bindings.add(new SortField("docid", SortField.Type.DOUBLE));
 			bindings.add(new SortField("_score", SortField.Type.SCORE));
-			bindings.add(new SortField("score", SortField.Type.INT));
+			bindings.add(new SortField("score", SortField.Type.DOUBLE));
+
 			scoringMethod = expr.getDoubleValuesSource(bindings);
 		} catch (ParseException e) {
 			e.printStackTrace();
@@ -121,6 +134,20 @@ public class SearchIndex {
 
 	public void setNumThreads(int numThreads) {
 		this.numThreads = numThreads;
+	}
+
+	public boolean isDemoteDocs() {
+		return demoteDocs;
+	}
+
+	/**
+	 * Toggles demoting a document's score after each term match
+	 * This effectively reduces the chances that subsequent searches match the same document 
+	 *
+	 * @param demoteDocs Set to True enable document demotion for each match 
+	 */
+	public void setDemoteDocs(boolean demoteDocs) {
+		this.demoteDocs = demoteDocs;
 	}
 	
 	/*

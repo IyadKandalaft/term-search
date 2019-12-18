@@ -44,13 +44,18 @@ public class SearchCommand implements Callable<Integer> {
 			paramLabel="NUM")
 	private Integer highlightLimit;
 	
+	@Option(names={"-d", "--demote-docs"},
+			description="Demote document once it matches to avoid many results coming from the same document (default: ${DEFAULT-VALUE})"
+			)
+	private boolean demoteDocs;
+
 	@Option(names={"--threads"},
 			description="Number of threads/cores to use for searching (default: ${DEFAULT-VALUE})",
 			defaultValue="4",
 			type=Integer.class,
 			paramLabel="NUM")
 	private Integer threads;
-	
+
     @Option(names = { "-h", "--help" },
     		usageHelp = true,
     		description = "Displays this message")
@@ -65,11 +70,11 @@ public class SearchCommand implements Callable<Integer> {
 		System.out.println("-------------------------------------------------------");
 		
 		SearchIndex indexSearcher = new SearchIndex(termsFile, outputFile);
-		
+
 		indexSearcher.setSearchLimit(matchLimit);
 		indexSearcher.setHighlightLimit(highlightLimit);
 		indexSearcher.setNumThreads(threads);
-		
+		indexSearcher.setDemoteDocs(demoteDocs);
 		indexSearcher.searchAll("content");
 
 		indexSearcher.close();

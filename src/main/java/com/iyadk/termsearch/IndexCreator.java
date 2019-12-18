@@ -13,6 +13,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
@@ -20,9 +21,9 @@ import java.util.regex.PatternSyntaxException;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.DoubleDocValuesField;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
-import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -39,7 +40,7 @@ public class IndexCreator {
 	private int numThreads;
 	private List<Pattern> scoreOffsetPatterns;
 	private List<Float> scoreOffsetValues;
-	
+	private ConcurrentHashMap<String, Double> documentIDs;
 	private static enum qKeys {
 		LINE, LINEID
 	}
@@ -55,6 +56,7 @@ public class IndexCreator {
 		numThreads=1;
 		scoreOffsetPatterns = new LinkedList<>();
 		scoreOffsetValues = new LinkedList<>();
+		documentIDs = new ConcurrentHashMap<>();
 	}
 	
 	public IndexCreator(String corpus, String index) throws IOException {
@@ -106,8 +108,8 @@ public class IndexCreator {
 	 * 
 	 * @param documentTitle Document title containing the document score to parse
 	 */
-	public int parseDocumentScore(String documentTitle) throws NumberFormatException, StringIndexOutOfBoundsException {
-		return Integer.parseInt(documentTitle.substring(documentTitle.length() - 1, documentTitle.length()));
+	public double parseDocumentScore(String documentTitle) throws NumberFormatException, StringIndexOutOfBoundsException {
+		return Double.parseDouble(documentTitle.substring(documentTitle.length() - 1, documentTitle.length()));
 	}
 	
 	public void create() throws FileNotFoundException, IOException{
@@ -172,7 +174,7 @@ public class IndexCreator {
 					String docContent = splitLine[1];
 					
 					// Get the document score from the document title
-					int docScore;
+					double docScore;
 					try {
 						docScore = parseDocumentScore(docTitle);
 					} catch (NumberFormatException | StringIndexOutOfBoundsException e) {
@@ -183,13 +185,15 @@ public class IndexCreator {
 					
 					for(int i = 0; i < scoreOffsetPatterns.size(); i++) {
 						if ( scoreOffsetPatterns.get(i).matcher(docTitle).find() ) {
-							docScore = (int)(docScore * scoreOffsetValues.get(i) * 1000);
+							docScore = (docScore + scoreOffsetValues.get(i));
 						}
 					}
 
+					documentIDs.putIfAbsent(docTitle, Double.parseDouble(lineId));
+
 					// Add the document to the index
 					try {
-						writer.addDocument(schema.createDocument(docTitle, docContent, docScore));
+						writer.addDocument(schema.createDocument(docTitle, docContent, docScore, documentIDs.get(docTitle)));
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -303,14 +307,16 @@ public class IndexCreator {
 		 * Returns a document based on the defined schema to insert into the index
 		 * @param title The title of the document
 		 * @param content The content of the document
+		 * @param id The numeric ID to assign the document for later retrieval
 		 */
-		public Document createDocument(String title, String content, int score) {
+		public Document createDocument(String title, String content, double score, double docId) {
 			Document doc = new Document();
-			
+
 			doc.add(new Field("title", title, titleField));
 			doc.add(new Field("content", content, contentField));
-			doc.add(new NumericDocValuesField("score",score));
-			
+			doc.add(new DoubleDocValuesField("score", score));
+			doc.add(new DoubleDocValuesField("docid", docId));
+
 			return doc;
 		}
 	}
