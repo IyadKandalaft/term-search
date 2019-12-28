@@ -44,10 +44,14 @@ public class SearchCommand implements Callable<Integer> {
 			paramLabel="NUM")
 	private Integer highlightLimit;
 	
-	@Option(names={"-d", "--demote-docs"},
-			description="Demote document once it matches to avoid many results coming from the same document (default: ${DEFAULT-VALUE})"
+	@Option(names={"-s", "--scoring", "--scoring-formula"},
+			description="Result scoring formula. (default: ${DEFAULT-VALUE})\n"
+					+ "Computed vars: _score (lucene search score), score (parsed doc score), & docMatchCount (# of times doc has matched)\n"
+					+ "Functions: abs, cbrt, ceil, cos, exp, floor, log, max, min, pow, random, round, sin, sqrt, tan, trunc",
+			defaultValue="_score/score",
+			type=String.class
 			)
-	private boolean demoteDocs;
+	private String scoring;
 
 	@Option(names={"--threads"},
 			description="Number of threads/cores to use for searching (default: ${DEFAULT-VALUE})",
@@ -69,12 +73,12 @@ public class SearchCommand implements Callable<Integer> {
 		System.out.println("Start time: " + dateFormatter.format(new Date()));
 		System.out.println("-------------------------------------------------------");
 		
-		SearchIndex indexSearcher = new SearchIndex(termsFile, outputFile);
+		SearchIndex indexSearcher = new SearchIndex(termsFile, outputFile, indexDir);
 
 		indexSearcher.setSearchLimit(matchLimit);
 		indexSearcher.setHighlightLimit(highlightLimit);
 		indexSearcher.setNumThreads(threads);
-		indexSearcher.setDemoteDocs(demoteDocs);
+		indexSearcher.setScoring(scoring);
 		indexSearcher.searchAll("content");
 
 		indexSearcher.close();
