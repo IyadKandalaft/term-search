@@ -1,6 +1,10 @@
 package com.iyadk.termsearch;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.Callable;
@@ -46,8 +50,13 @@ public class IndexCommand implements Callable<Integer> {
 
 		SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 
+		if (Files.exists(Paths.get(indexDir))) {
+			System.out.printf("Removing existing lucene index:%s\n", indexDir);
+			Files.walk(Paths.get(indexDir)).map(Path::toFile).forEach(File::delete);
+		}
+
 		IndexCreator indexCreator = new IndexCreator(corpusFile, indexDir);
-		
+
 		indexCreator.setDelimeter(delimeter);
 		indexCreator.setNumThreads(threads);
 		try {
