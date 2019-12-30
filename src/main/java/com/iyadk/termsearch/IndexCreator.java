@@ -86,9 +86,12 @@ public class IndexCreator {
 		BufferedReader bufferedReader = new BufferedReader(fileInputStreamReader, 262144);
 		
 		String line;
+		int lineCount = 0;
 		while ( (line = bufferedReader.readLine()) != null ){
+			lineCount++;
 			String[] lineParts = line.split("\t");
 			if (lineParts.length != 2 ) {
+				System.out.printf("Score offset file line %d could not be parsed: %s", lineCount++, line);
 				continue;
 			}			
 			scoreOffsetPatterns.add(Pattern.compile(lineParts[0]));
