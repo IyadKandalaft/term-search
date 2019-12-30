@@ -16,8 +16,11 @@ public class SearchDocumentMatches {
 		return docMatches;
 	}
 	
-	public synchronized static double incrementDocMatchCount(double docID) {
-		Double count = docMatches.put(docID, getDocMatchCount(docID) + 1);
+	public static double incrementDocMatchCount(double docID) {
+		Double count;
+		synchronized (docMatches) {
+			count = docMatches.put(docID, getDocMatchCount(docID) + 1);
+		}
 		if (count == null)
 			return 1;
 		return count;
