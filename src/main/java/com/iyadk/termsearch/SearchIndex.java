@@ -1,6 +1,7 @@
 package com.iyadk.termsearch;
 
 import java.io.BufferedReader;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -105,7 +106,7 @@ public class SearchIndex {
 		HashMap<String,Method> functions = new HashMap<>();
 
 		// docMatchCount is a function that needs to be passed the docid
-		scoringFormula.replaceAll("docMatchCount", "docMatchCount(docid)");
+		scoringFormula = scoringFormula.replaceAll("docMatchCount", "docMatchCount(docid)");
 		this.scoringFormula = scoringFormula;
 
 		// Add all javascript functions to the list of usable functions
@@ -125,6 +126,14 @@ public class SearchIndex {
 			functions.put("docMatchCount", docMatchCountMethod);
 		} catch (NoSuchMethodException e) {
 			System.out.println("The SearchDocumentMatches.incrementDocMatchCount method is missing");
+		}
+
+		Method randomMethod;
+		try {
+			randomMethod = Math.class.getMethod("random");
+			functions.put("random", randomMethod);
+		} catch (NoSuchMethodException e) {
+			System.out.println("The Math.random method is missing");
 		}
 
 		try {
@@ -270,13 +279,16 @@ public class SearchIndex {
 	}
 
 	private Query getQuery(String phrase, String field) {
-		PhraseQuery phraseQuery = new PhraseQuery(field, phrase.split(" "));
+		int slop = 0; 
+		phrase = phrase.replace('-', ' ').replace(".", "");
+
+		PhraseQuery phraseQuery = new PhraseQuery(slop, field, phrase.split(" "));
 		return new FunctionScoreQuery(phraseQuery, scoringMethod);
 	}
 
 	private String getHighlightedField(Query query, Analyzer analyzer, String fieldName, String fieldValue)
 			throws IOException, InvalidTokenOffsetsException {
-		QueryScorer queryScorer = new QueryScorer(query);
+		QueryScorer queryScorer = new QueryScorer(query, fieldName);
 		Highlighter highlighter = new Highlighter(formatter, queryScorer);
 		highlighter.setTextFragmenter(new SimpleSpanFragmenter(queryScorer, highlightLimit));
 		highlighter.setMaxDocCharsToAnalyze(Integer.MAX_VALUE);
