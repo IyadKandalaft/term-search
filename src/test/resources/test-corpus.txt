@@ -6,10 +6,10 @@ Test Doc 1 - 1.txt:This is sample text where a term is composed of Two Words wit
 Test Doc 2 - 1.txt:This is sample text where a term is surrounded by "quote"
 Test Doc 2 - 1.txt:This is sample text where a term ends with "a quote"
 Test Doc 2 - 1.txt:This is sample text where a term starts with a "quote only"
-Test Doc 3 - 1.txt:This is sample text where a term is suffixed by a hyphen-term
-Test Doc 3 - 1.txt:This is sample text where a term is prefixed by a term-hyphen
-Test Doc 4 - 1.txt:My sample text where the first term will not be matched
-Test Doc 4 - 1.txt:My sample text where a the first term My is not matched but the second one is
+Test Doc 3 - 1.txt:This is sample text where a term is suffixed by a hyphen traffic-jam will match
+Test Doc 3 - 1.txt:This is sample text where a term is prefixed by a hyphen slow-traffic will match
+Test Doc 4 - 1.txt:This is sample text where the first word will not be matched. Pancakes are yummy will not match
+Test Doc 4 - 1.txt:This is sample text where the first word will not be matched. Pancakes are always good Pancakes will match
 Test Doc 4 - 1.txt:First word of this sentence will not be matched.  First word of this sentence will not be matched.
 Test Doc 4 - 1.txt:First word of this sentence will not be matched!  First word of this sentence will not be matched.
 Test Doc 4 - 1.txt:First word of this sentence will not be matched.  "First word of this sentence will not be matched."
@@ -23,3 +23,10 @@ Test Doc 5 - 5.txt:My sample text where the result order is based on document pr
 Test Doc 6 - 1.txt:First word of this sentence will not be matched, yet the first word of this sentence will be matched.
 Test Doc 6 - 1.txt:First word of this sentence will not be matched, Yet the first word of this sentence will be matched.
 Test Doc 7 - 1.txt:Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched.  Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched!  Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched;  Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched.  Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched. Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched. Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched; Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched. Undoubtedly, a very long text to validate that capitalized words at the beginning of a sentence are not matched.
+Test Doc 8 - 1.txt:This is sample text that will test for no slop matching where slop term should match
+Test Doc 8 - 1.txt:This is sample text that will test for no slop matching where slop my term should not match
+Test Doc 9 - 1.txt:This is sample text that will test for no slop matching with hyphen where slop-hyphen-term will match
+Test Doc 9 - 1.txt:This is sample text that will test for no slop matching with hyphen where slop hyphen term will match
+Test Doc 9 - 1.txt:This is sample text that will test for no slop matching with hyphen where slop-hyphen-my-term will not match 
+Test Doc 10 - 1.txt:This is sample text that will test for no slop matching with punctuation where Mr. Term will match
+Test Doc 10 - 1.txt:This is sample text that will test for no slop matching with punctuation where Mr. My Term will not match

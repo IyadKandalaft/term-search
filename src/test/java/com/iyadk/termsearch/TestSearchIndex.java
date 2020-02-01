@@ -189,40 +189,35 @@ public class TestSearchIndex {
 
 	@Test
 	public void testSearchTermHyphen() throws IOException {
-		String phrase = "hyphen";
+		String phrase = "traffic";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
-				0, results.scoreDocs.length);
-		assertTrue(String.format("More than two results were found for search phrase: %s", phrase),
-				(results.scoreDocs.length < 3));
+		assertEquals(String.format("More than two results were found for search phrase: %s", phrase),
+				2, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
 
 			assertTrue(String.format("Result without a hyphen was matched for phrase/term: %s", phrase),
-					d.get(field).equals("This is sample text where a term is suffixed by a hyphen-term")
-							|| d.get(field).equals("This is sample text where a term is prefixed by a term-hyphen"));
+					d.get(field).endsWith("will match"));
 		}
 	}
 	
 	@Test
 	public void testSearchTermIgnoreFirstInDocument() throws IOException {
-		String phrase = "My";
+		String phrase = "Pancakes";
 
 		TopDocs results = indexSearcher.searchPhrase(phrase, field);
 
-		assertNotEquals(String.format("No results found for search phrase/term: %s", phrase),
-				0, results.scoreDocs.length);
-		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+		assertEquals(String.format("The first word in the sentence is being matched for the phrase/term: %s", phrase),
 				1, results.scoreDocs.length);
 
 		for (ScoreDoc sd : results.scoreDocs) {
 			Document d = indexSearcher.searcher.doc(sd.doc);
 
 			assertTrue(String.format("The first word in the sentence is being matched for the phrase/term: %s", phrase),
-					d.get(field).equals("My sample text where a the first term My is not matched but the second one is"));
+					d.get(field).endsWith("will match"));
 		}
 	}
 
@@ -260,6 +255,69 @@ public class TestSearchIndex {
 
 			assertTrue(String.format("The first word after a comma is not being matched for the phrase/term: %s", phrase),
 					d.get(field).equals("First word of this sentence will not be matched, yet the first word of this sentence will be matched."));
+		}
+	}
+
+	/*
+	 * Ensure that multi-term search is matched verbatim without slop
+	 * i.e. "my term" matches "this is my term" but not "this is my work term" 
+	 */
+	@Test
+	public void testSearchTermMatchNoSlop() throws IOException {
+		String phrase = "slop term";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+				1, results.scoreDocs.length);
+
+		for (ScoreDoc sd : results.scoreDocs) {
+			Document d = indexSearcher.searcher.doc(sd.doc);
+
+			assertTrue(String.format("Multi-term search is matching with slop for the phrase/term: %s", phrase),
+					d.get(field).endsWith("should match"));
+		}
+	}
+
+	/*
+	 * Ensure that multi-term search is matched verbatim without slop even when it contains hyphen
+	 * i.e. "my-term" matches "this is my term" and "this is my-term" but not "this is my work term" 
+	 */
+	@Test
+	public void testSearchTermMatchNoSlopHyphen() throws IOException {
+		String phrase = "slop-hyphen-term";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+				2, results.scoreDocs.length);
+
+		for (ScoreDoc sd : results.scoreDocs) {
+			Document d = indexSearcher.searcher.doc(sd.doc);
+
+			assertTrue(String.format("Multi-term search with a hyphen is matching with slop for the phrase/term: %s", phrase),
+					d.get(field).endsWith("will match"));
+		}
+	}
+
+	/*
+	 * Ensure that multi-term search is matched verbatim without slop even when it contains abbreviations
+	 * i.e. "Dr. Pepper" matches "Dr. Pepper" but not "Dr. My Pepper" 
+	 */
+	@Test
+	public void testSearchTermMatchNoSlopAbbrev() throws IOException {
+		String phrase = "Mr. Term";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+				1, results.scoreDocs.length);
+
+		for (ScoreDoc sd : results.scoreDocs) {
+			Document d = indexSearcher.searcher.doc(sd.doc);
+
+			assertTrue(String.format("A multi-term search with an abbreviation is matching with slop for the phrase/term: %s", phrase),
+					d.get(field).endsWith("will match"));
 		}
 	}
 
