@@ -1,7 +1,6 @@
 package com.iyadk.termsearch;
 
 import java.io.BufferedReader;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -11,8 +10,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.BreakIterator;
 import java.text.ParseException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -27,14 +28,11 @@ import org.apache.lucene.search.DoubleValuesSource;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.highlight.Highlighter;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
-import org.apache.lucene.search.highlight.QueryScorer;
-import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
-import org.apache.lucene.search.highlight.SimpleSpanFragmenter;
+import org.apache.lucene.search.uhighlight.DefaultPassageFormatter;
+import org.apache.lucene.search.uhighlight.UnifiedHighlighter;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
 
@@ -50,7 +48,6 @@ public class SearchIndex {
 
 	private Directory dirIndex;
 	private IndexReader reader;
-	private SimpleHTMLFormatter formatter;
 	private Analyzer analyzer;
 	public IndexSearcher searcher;
 
@@ -86,7 +83,6 @@ public class SearchIndex {
 		dirIndex = MMapDirectory.open(indexPath);
 		reader = DirectoryReader.open(dirIndex);
 		searcher = new IndexSearcher(reader);
-		formatter = new SimpleHTMLFormatter("[ ", " ]");
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
 
 		setScoring(scoringFormula);
@@ -194,7 +190,7 @@ public class SearchIndex {
 		// Use the correct line separator based on the operating system
 		String lnSeperator = System.lineSeparator();
 
-        ExecutorService threadPool = Executors.newFixedThreadPool(6);
+        ExecutorService threadPool = Executors.newFixedThreadPool(numThreads);
 
 		// Read the file using a memory buffer to improve performance
 		try (BufferedReader in = Files.newBufferedReader(termsPath, StandardCharsets.UTF_8)) {
@@ -217,29 +213,35 @@ public class SearchIndex {
 						Query query = getQuery(searchString, field);
 
 						TopDocs searchResults;
-
+						String[] fragments;
 						try {
 							searchResults = searchPhrase(searchString, field);
 
-							for (ScoreDoc sd : searchResults.scoreDocs) {
-								Document d = searcher.doc(sd.doc);
+							if ( searchResults.totalHits.value != 0 ) {
+								// Configure term highlighting in results
+								UnifiedHighlighter highlighter = new UnifiedHighlighter(searcher, analyzer);
+								highlighter.setMaxLength(Integer.MAX_VALUE - 1);
+								BreakIterator breakIterator = BreakIterator.getSentenceInstance(Locale.ENGLISH);
+								highlighter.setBreakIterator(() -> breakIterator);
+								highlighter.setFormatter(new DefaultPassageFormatter("", "", " ... ", false));
 
-								String fragment = getHighlightedField(query, analyzer, "content", d.get("content"));
-								// TODO: Occasionally, fragment is null and throws an exception
-								if (fragment == null) {
-									continue;
+								fragments = highlighter.highlight(field, query, searchResults, 1);
+
+								for (int i = 0; i < searchResults.scoreDocs.length; i++) {
+									Document doc = searcher.doc(searchResults.scoreDocs[i].doc);
+									String fragment = fragments[i];
+
+									bufferedWriter.write(searchString + "\t" + fragment.replaceAll("[\\t\\r\\n]",  " ") +
+											"\t" + doc.get("title").replaceAll("[\\t\\r\\n]", " ") + lnSeperator);
 								}
-
-								bufferedWriter
-										.write(searchString + "\t" + fragment.replace("\t",  " ") + "\t" + d.get("title").replace("\t", " ") + lnSeperator);
 							}
-
-							System.out.print("Searching for: " + searchString + lnSeperator + "Total Results: "
-									+ searchResults.totalHits + lnSeperator);
-						} catch (IOException | InvalidTokenOffsetsException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
+						} catch ( IOException e ) {
+							// Something is wrong with reading the index
+							return;
 						}
+
+						System.out.print("Searching for: " + searchString + lnSeperator +
+								"Total Results: " + searchResults.totalHits + lnSeperator);
 					}
 				}
 
@@ -284,15 +286,6 @@ public class SearchIndex {
 
 		PhraseQuery phraseQuery = new PhraseQuery(slop, field, phrase.split(" "));
 		return new FunctionScoreQuery(phraseQuery, scoringMethod);
-	}
-
-	private String getHighlightedField(Query query, Analyzer analyzer, String fieldName, String fieldValue)
-			throws IOException, InvalidTokenOffsetsException {
-		QueryScorer queryScorer = new QueryScorer(query, fieldName);
-		Highlighter highlighter = new Highlighter(formatter, queryScorer);
-		highlighter.setTextFragmenter(new SimpleSpanFragmenter(queryScorer, highlightLimit));
-		highlighter.setMaxDocCharsToAnalyze(Integer.MAX_VALUE);
-		return highlighter.getBestFragment(analyzer, fieldName, fieldValue);
 	}
 
 	/*

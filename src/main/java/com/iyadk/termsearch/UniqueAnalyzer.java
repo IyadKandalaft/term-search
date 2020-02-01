@@ -26,11 +26,11 @@ public class UniqueAnalyzer{
 				"Ph.D", "M.D", "B.A", "M.A", "D.D.S",
 				"U.S", "U.S.A", "e.g", "i.e", "etc", "et al", "ca", "O.K",
 				"A.M", "P.M","A.D", "B.C"));
-		
+
 		// Escape all "." with "\\" to prepare it for the regex 
 		abbreviations.replaceAll(s -> s.replace(".", "\\."));
 		// Pattern matching sentence-ending punctuation but ignores periods after common abbrev: "Mr. Author"
-		String regexPattern = "(\"|!|\\?|(?<!" + String.join("|", abbreviations) + ")\\.|;|:)(\\s*)[A-Z](\\w+)[^\"']";
+		String regexPattern = "(\"|!|\\?|(?<!" + String.join("|", abbreviations) + ")\\.|;|:)(\\s*)[A-Z](\\w+[^\\\"'])";
 
 		HashMap<String, String> firstWordRegExpFilter = new HashMap<String,String>();
 		// RegExp to remove the first word of every sentence

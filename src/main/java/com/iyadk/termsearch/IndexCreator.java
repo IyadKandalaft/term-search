@@ -298,7 +298,7 @@ public class IndexCreator {
 			titleField.freeze();
 
 			contentField = new FieldType();
-			contentField.setIndexOptions( IndexOptions.DOCS_AND_FREQS_AND_POSITIONS );
+			contentField.setIndexOptions( IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS );
 			contentField.setStoreTermVectors( true );
 			contentField.setStoreTermVectorPositions( true );
 			contentField.setTokenized( true );
