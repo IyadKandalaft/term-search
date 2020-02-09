@@ -31,9 +31,8 @@ public class IndexCommand implements Callable<Integer> {
 	private String delimeter;
 	
 	@Option(names={"-s", "--score-offset"},
-			description="TSV file w/ 2 columns containing a regex and a multiplying factor that offsets document scores that match the regex"
-			)
-	private String offsetLookupFile;
+			description="TSV file w/ 2 columns containing a regex and a multiplying factor that offsets document scores that match the regex")
+	private File offsetLookupFile;
 	
 	@Option(names={"--threads"},
 			description="Number of threads/cores to use for indexing (default: ${DEFAULT-VALUE})",

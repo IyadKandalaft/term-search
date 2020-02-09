@@ -281,7 +281,11 @@ public class SearchIndex {
 	}
 
 	private Query getQuery(String phrase, String field) {
-		int slop = 0; 
+		// Ensure that multiple search terms are matched exactly without any 
+		// words in between (no slop)
+		int slop = 0;
+		// Remove hyphens and periods from search terms to permit various occurrence patterns
+		// e.g. "well-groomed" matches "well groomed" in addition to "well-groomed"
 		phrase = phrase.replace('-', ' ').replace(".", "");
 
 		PhraseQuery phraseQuery = new PhraseQuery(slop, field, phrase.split(" "));

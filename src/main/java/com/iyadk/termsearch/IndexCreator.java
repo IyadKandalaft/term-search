@@ -1,6 +1,7 @@
 package com.iyadk.termsearch;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -80,8 +81,8 @@ public class IndexCreator {
 		this.numThreads = numThreads;
 	}
 	
-	public void setOffsetLookup(String offsetLookupFile) throws IOException, FileNotFoundException, PatternSyntaxException, NumberFormatException {
-		InputStream fileInputStream = new FileInputStream(Paths.get(offsetLookupFile).toFile());
+	public void setOffsetLookup(File offsetLookupFile) throws IOException, FileNotFoundException, PatternSyntaxException, NumberFormatException {
+		InputStream fileInputStream = new FileInputStream(offsetLookupFile);
 		InputStreamReader fileInputStreamReader = new InputStreamReader(fileInputStream);
 		BufferedReader bufferedReader = new BufferedReader(fileInputStreamReader, 262144);
 		
