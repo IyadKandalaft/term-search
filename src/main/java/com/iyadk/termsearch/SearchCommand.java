@@ -37,12 +37,19 @@ public class SearchCommand implements Callable<Integer> {
 			paramLabel="NUM")
 	private Integer matchLimit;
 	
-	@Option(names={"-l", "--highlight-limit"},
-			description="Maximum number of characters to return surrounding a matched term (default: ${DEFAULT-VALUE})",
-			defaultValue="500",
+	@Option(names={"-hs", "--highlight-min"},
+			description="Minimum number of characters to return surrounding a matched term (default: ${DEFAULT-VALUE})",
+			defaultValue="50",
 			type=Integer.class,
 			paramLabel="NUM")
-	private Integer highlightLimit;
+	private Integer highlightMin;
+	
+	@Option(names={"-hx", "--highlight-max"},
+			description="Maximum number of characters to return surrounding a matched term (default: ${DEFAULT-VALUE})",
+			defaultValue="180",
+			type=Integer.class,
+			paramLabel="NUM")
+	private Integer highlightMax;
 	
 	@Option(names={"-s", "--scoring", "--scoring-formula"},
 			description="Result scoring formula. (default: ${DEFAULT-VALUE})\n"
@@ -76,7 +83,7 @@ public class SearchCommand implements Callable<Integer> {
 		SearchIndex indexSearcher = new SearchIndex(termsFile, outputFile, indexDir);
 
 		indexSearcher.setSearchLimit(matchLimit);
-		indexSearcher.setHighlightLimit(highlightLimit);
+		indexSearcher.setHighlightLimit(highlightMin, highlightMax);
 		indexSearcher.setNumThreads(threads);
 		indexSearcher.setScoring(scoring);
 		indexSearcher.searchAll("content");

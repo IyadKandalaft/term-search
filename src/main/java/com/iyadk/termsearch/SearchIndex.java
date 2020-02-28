@@ -5,15 +5,14 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.BreakIterator;
 import java.text.ParseException;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -32,6 +31,7 @@ import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.uhighlight.DefaultPassageFormatter;
+import org.apache.lucene.search.uhighlight.PassageScorer;
 import org.apache.lucene.search.uhighlight.UnifiedHighlighter;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
@@ -41,15 +41,16 @@ public class SearchIndex {
 	private Path indexPath;
 	private Path outputPath;
 	private int searchLimit = 100;
-	private int highlightLimit = 500;
-	String scoringFormula = "_score / score";
-	DoubleValuesSource scoringMethod;
+	private int highlightMin = 50;
+	private int highlightMax = 180;
+	private String scoringFormula = "_score / score";
+	private DoubleValuesSource scoringMethod;
 	private int numThreads = 4;
 
-	private Directory dirIndex;
-	private IndexReader reader;
-	private Analyzer analyzer;
-	public IndexSearcher searcher;
+	private final Directory dirIndex;
+	private final IndexReader reader;
+	private final Analyzer analyzer;
+	public final IndexSearcher searcher;
 
 	/*
 	 * @param terms Path to file with each search phrase/term per line
@@ -149,12 +150,14 @@ public class SearchIndex {
 		this.searchLimit = searchLimit;
 	}
 
-	public int getHighlightLimit() {
+	public int[] getHighlightLimit() {
+		int highlightLimit[] = new int[]{highlightMin, highlightMax};
 		return highlightLimit;
 	}
 
-	public void setHighlightLimit(int highlightLimit) {
-		this.highlightLimit = highlightLimit;
+	public void setHighlightLimit(int highlightMin, int highlightMax) {
+		this.highlightMin = highlightMin;
+		this.highlightMax = highlightMax;
 	}
 
 	public int getNumThreads() {
@@ -202,10 +205,10 @@ public class SearchIndex {
 				}
 
 				class subSearch implements Runnable {
-					private String searchString;
+					private final String searchString;
 
 					subSearch(String s) {
-						searchString = s;
+						this.searchString = s;
 					}
 
 					@Override
@@ -221,9 +224,12 @@ public class SearchIndex {
 								// Configure term highlighting in results
 								UnifiedHighlighter highlighter = new UnifiedHighlighter(searcher, analyzer);
 								highlighter.setMaxLength(Integer.MAX_VALUE - 1);
-								BreakIterator breakIterator = BreakIterator.getSentenceInstance(Locale.ENGLISH);
-								highlighter.setBreakIterator(() -> breakIterator);
-								highlighter.setFormatter(new DefaultPassageFormatter("", "", " ... ", false));
+								
+								NaturalBreakIterator lengthBreakIterator = new NaturalBreakIterator(highlightMin, highlightMax, searchString.length());
+								PassageScorer scorer = new PassageScorer(0, 0, 82);
+								highlighter.setScorer(scorer);
+								highlighter.setBreakIterator(() -> lengthBreakIterator);
+								highlighter.setFormatter(new DefaultPassageFormatter("", "", "...", false));
 
 								fragments = highlighter.highlight(field, query, searchResults, 1);
 
