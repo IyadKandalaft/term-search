@@ -30,14 +30,14 @@ public class UniqueAnalyzer{
 		// Escape all "." with "\\" to prepare it for the regex 
 		abbreviations.replaceAll(s -> s.replace(".", "\\."));
 		// Pattern matching sentence-ending punctuation but ignores periods after common abbrev: "Mr. Author"
-		String regexPattern = "(\"|!|\\?|(?<!" + String.join("|", abbreviations) + ")\\.|;|:)(\\s*)[A-Z](\\w+[^\\\"'])";
+		String regexPattern = "(\"|!|\\?|(?<!" + String.join("|", abbreviations) + ")\\.|;|:)(\\s*)[A-Z]\\w+[^\\\"']";
 
 		HashMap<String, String> firstWordRegExpFilter = new HashMap<String,String>();
 		// RegExp to remove the first word of every sentence
 		//firstWordRegExpFilter.put("pattern", "([\"!.;:])(\\s*)[A-Z](\\w+)[^\"']");
 		//firstWordRegExpFilter.put("replacement", "$1$2*$3");
 		firstWordRegExpFilter.put("pattern", regexPattern);
-		firstWordRegExpFilter.put("replacement", "$1$2*$3");
+		firstWordRegExpFilter.put("replacement", "$1$2");
 
 		analyzer = CustomAnalyzer.builder()
 		.addCharFilter(PatternReplaceCharFilterFactory.class, firstWordRegExpFilter)

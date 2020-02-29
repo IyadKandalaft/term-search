@@ -240,6 +240,16 @@ public class TestSearchIndex {
 		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
 				0, results.scoreDocs.length);
 	}
+	
+	@Test
+	public void testSearchTermPartialFirstMatch() throws IOException {
+		String phrase = "doubtedly";
+
+		TopDocs results = indexSearcher.searchPhrase(phrase, field);
+
+		assertEquals(String.format("Incorrect number of results were found for search phrase/term: %s", phrase),
+				0, results.scoreDocs.length);
+	}
 
 	@Test
 	public void testSearchTermMatchAfterCommaLCase() throws IOException {
