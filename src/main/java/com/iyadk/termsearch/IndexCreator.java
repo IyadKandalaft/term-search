@@ -85,7 +85,7 @@ public class IndexCreator {
 		InputStream fileInputStream = new FileInputStream(offsetLookupFile);
 		InputStreamReader fileInputStreamReader = new InputStreamReader(fileInputStream);
 		BufferedReader bufferedReader = new BufferedReader(fileInputStreamReader, 262144);
-		
+
 		String line;
 		int lineCount = 0;
 		while ( (line = bufferedReader.readLine()) != null ){
@@ -94,7 +94,7 @@ public class IndexCreator {
 			if (lineParts.length != 2 ) {
 				System.out.printf("Score offset file line %d could not be parsed: %s", lineCount++, line);
 				continue;
-			}			
+			}
 			scoreOffsetPatterns.add(Pattern.compile(lineParts[0]));
 			scoreOffsetValues.add(Float.parseFloat(lineParts[1]));
 		}
@@ -187,9 +187,15 @@ public class IndexCreator {
 						continue;
 					}
 					
+					boolean addDocument = true;
+					
 					for(int i = 0; i < scoreOffsetPatterns.size(); i++) {
 						if ( scoreOffsetPatterns.get(i).matcher(docTitle).find() ) {
 							docScore = (docScore + scoreOffsetValues.get(i));
+							// Skip documents that match a scoreOffset with a score of 0
+							if (scoreOffsetValues.get(i) == 0) {
+								addDocument = false;
+							}
 						}
 					}
 
@@ -197,7 +203,8 @@ public class IndexCreator {
 
 					// Add the document to the index
 					try {
-						writer.addDocument(schema.createDocument(docTitle, docContent, docScore, documentIDs.get(docTitle)));
+						if (addDocument)
+							writer.addDocument(schema.createDocument(docTitle, docContent, docScore, documentIDs.get(docTitle)));
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();

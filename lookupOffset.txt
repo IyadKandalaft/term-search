@@ -6,3 +6,5 @@
 - 198\d -	0.02
 - 199\d -	0.01
 The New Yorker	2.5
+(Preview|trans\.|Psychopath Free)	0
+/.+/	0
