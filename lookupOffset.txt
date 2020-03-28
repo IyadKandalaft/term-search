@@ -1,10 +1,26 @@
-- 16\d\d -	0.2
-- 1[78]\d\d -	0.1
-- 19[0-4]\d -	0.08
-- 19[56]\d -	0.06
-- 19[67]\d -	0.04
-- 198\d -	0.02
-- 199\d -	0.01
-The New Yorker	2.5
-(Preview|trans\.|Psychopath Free)	0
-/.+/	0
+# Scoring offset
+# Add regex rules to augment or reduce the score of a document where the title matches
+# Note that this only takes effect during indexing.  You must recreate the index if you modify this document
+# 
+# The file is tab formatted as follows where | represents a tab character
+# Regex or exact match (REGEX|EXACT) | Text to match (string) | Score offset (float) | Stop processing rules (T/F)
+# 
+# As an example, to augment a document score by 0.1 if it matches the regex "Alice in Wonder.+" and stop processing following rules
+# REGEX	Alice in Wonder.+	0.1	T
+REGEX	(Preview|trans\.|Psychopath Free)	0	T
+REGEX	/.+/	0	T
+REGEX	- 16\d\d -	0.2	F
+REGEX	- 1[78]\d\d -	0.1	F
+REGEX	- 19[0-4]\d -	0.08	F
+REGEX	- 19[56]\d -	0.06	F
+REGEX	- 19[67]\d -	0.04	F
+REGEX	- 198\d -	0.02	F
+REGEX	- 199\d -	0.01	F
+EXACT	The New Yorker	2.5	T
+EXACT	John Steinbeck	0.25	T
+REGEX	Michael Cunningham|Paul Harding|Peter Medawar|Thornton Wilder	0.05	T
+REGEX	Cormac McCarthy|Dave Eggers|Ernest Hemingway|John Updike|Jon Krakauer|Thomas Pynchon	0.2	T
+EXACT	Board of Edu. v. Barnette	0.3	T
+EXACT	Kitchen Confidential - Anthony Bourdain	0.3	T
+REGEX	Charlotte Brontë|Emily Brontë|Rachel Abbott|Kathy Acker|Chimamanda Ngozi Adichie|Renata Adler|Louisa May Alcott|Isabel Allende|Kelley Armstrong|Margaret Atwood|Jean M. Auel|Jane Austen|Beryl Bainbridge|Maya Banks|Muriel Barbery|Patricia Briggs|Geraldine Brooks|Pearl S. Buck|Frances Hodgson Burnett|A. S. Byatt|Jacqueline Carey|Rachel Carson|Angela Carter|Willa Cather|Jung Chang|Agatha Christie|Hélène Cixous|Cassandra Clare|Susanna Clarke|Beverly Cleary|Colette|Patricia Cornwell|Edwidge Danticat|Kiran Desai|Anita Diamant|Kate DiCamillo|Emma Donoghue|Esi Edugyan|Anne Enright|Clarissa Pinkola Estés|Janet Evanovich|Tina Fey|Helen Fielding|Gillian Flynn|Elizabeth Gaskell|Elizabeth George|Margaret George|Allegra Goodman|Nadine Gordimer|Shirley Ann Grau|Kristin Hannah|Paula Hawkins|Zora Neale Hurston|P. D. James|Paulette Jiles|Jenny Joseph|Barbara Kingsolver|Harper Lee|Tanith Lee|Madeleine L'Engle|Doris Lessing|Andrea Levy|Alison Lurie|Mary MacLane|Hilary Mantel|Mary McCarthy|Colleen McCullough|Richelle Mead|Stephenie Meyer|Margaret Mitchell|Toni Morrison|Audrey Niffenegger|Joyce Carol Oates|Flannery O'Connor|Cynthia Ozick|Ann Patchett|Louise Penny|Elizabeth Peters|Jodi Picoult|Tamora Pierce|Alejandra Pizarnik|Sylvia Plath|Katherine Anne Porter|Diane di Prima|Annie Proulx|Ayn Rand|Marjorie Kinnan Rawlings|Anne Rice|Nora Roberts|Marilynne Robinson|Veronica Roth|Arundhati Roy|Karen Russell|Marjane Satrapi|Dorothy L. Sayers|Alice Sebold|Lisa See|Carol Shields|Rebecca Skloot|Karin Slaughter|Jane Smiley|Betty Smith|Patti Smith|Zadie Smith|Susan Sontag|Maggie Stiefvater|Elizabeth Strout|Amy Tan|Donna Tartt|Sara Teasdale|Anne Tyler|Kate Walbert|Alice Walker|Wendy Wasserstein|Sarah Waters|Edith Wharton|Ella Wheeler Wilcox|Laura Ingalls Wilder|Connie Willis|Marguerite Yourcenar|Chinua Achebe|Khaled Hosseini|Kazuo Ishiguro|Colson Whitehead|Junot Díaz|J.K. Rowling|Isaac Asimov|E. Annie Proulx|Mara Hvistendahl|Viet Thanh Nguyen|Lauren Oliver|J.R.R. Tolkien|Mary Wollstonecraft Shelley|Helena Cronin|Laura Hillenbrand|Caroline Elkins|Booker T. Washington|Diane McWhorter|Judith Rich Harris|Julie Orringer|Emily Brontë|Patricia Marx|Kathryn Stockett|Anne Applebaum|Charlotte Brontë|Lauren Collins|Daniel Defoe|Steve Coll|Doris Kearns Goodwin|Rebecca Mead|Jill Lepore|Margaret Talbot|Chelsea Handler|Susan Orlean|Mimi Sheraton|Judith Thurman|Jane Mayer|Ellen Meloy|Cheryl Strayed|Roberta Gellis|Kristen Heitzmann|Kristen Ashley|Karan Mahajan|Han Kang|Sara Shepard|Lisa Genova|Donna Kauffman|Connie Bruck|Virginia De Winter|Tara Westover|Sarah Dessen|Larissa MacFarquhar|Larissa Ione|Dr. Seuss|Louise Dean|Linda Howard|Karen Chance|Elizabeth   Hunter|Carrie Seidman|Anna Kisselgoff|Nicole Sager|Molly O'Neill|Marisa Silver|Marilyn Grey|Lois McMaster Bujold|Lisa Kleypas|Lena Dunham|Lalita Tademy|Kirstin Valdez Quade|Kerstin Gier|Jennifer L. Armentrout|Jennifer Kahn|Jean Kwok|Jani Wooldridge|Janet Malcolm|Jane Kramer|Ellen G. White|Elle Kennedy|Christine Feehan|Chelsey Minnis|Caitlin Horrocks|Beth Moore|Barbara Crossette|Anna Kamieńska	-0.12	T
+REGEX	Jhumpa Lahiri|Jennifer Egan|Elizabeth Kolbert|Katherine Boo|Kelly Link|Virginia Woolf|Eudora Welty|Joan Didion|Suzanne Collins	-0.09	T

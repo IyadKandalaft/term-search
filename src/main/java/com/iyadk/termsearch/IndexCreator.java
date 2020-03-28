@@ -17,7 +17,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import org.apache.lucene.analysis.Analyzer;
@@ -32,6 +31,8 @@ import org.apache.lucene.index.TieredMergePolicy;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
 
+import com.iyadk.termsearch.ScoreOffsetRule.SearchTypeEnum;
+
 public class IndexCreator {
 	private Path corpusPath;
 	private Path indexPath;
@@ -39,8 +40,7 @@ public class IndexCreator {
 	private String delimeter;
 	private Analyzer analyzer;
 	private int numThreads;
-	private List<Pattern> scoreOffsetPatterns;
-	private List<Float> scoreOffsetValues;
+	private List<ScoreOffsetRule> scoreOffsetRules;
 	private ConcurrentHashMap<String, Double> documentIDs;
 	private static enum qKeys {
 		LINE, LINEID
@@ -55,8 +55,7 @@ public class IndexCreator {
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
 		delimeter = ".txt:";
 		numThreads=1;
-		scoreOffsetPatterns = new LinkedList<>();
-		scoreOffsetValues = new LinkedList<>();
+		scoreOffsetRules = new LinkedList<>();
 		documentIDs = new ConcurrentHashMap<>();
 	}
 	
@@ -81,22 +80,41 @@ public class IndexCreator {
 		this.numThreads = numThreads;
 	}
 	
-	public void setOffsetLookup(File offsetLookupFile) throws IOException, FileNotFoundException, PatternSyntaxException, NumberFormatException {
+	public void setOffsetLookup(File offsetLookupFile)
+			throws IOException, FileNotFoundException, PatternSyntaxException, NumberFormatException {
 		InputStream fileInputStream = new FileInputStream(offsetLookupFile);
 		InputStreamReader fileInputStreamReader = new InputStreamReader(fileInputStream);
 		BufferedReader bufferedReader = new BufferedReader(fileInputStreamReader, 262144);
 
 		String line;
 		int lineCount = 0;
-		while ( (line = bufferedReader.readLine()) != null ){
+		while ((line = bufferedReader.readLine()) != null) {
 			lineCount++;
-			String[] lineParts = line.split("\t");
-			if (lineParts.length != 2 ) {
-				System.out.printf("Score offset file line %d could not be parsed: %s", lineCount++, line);
+			// Skip comments
+			if (line.matches("^\\s*#")) {
 				continue;
 			}
-			scoreOffsetPatterns.add(Pattern.compile(lineParts[0]));
-			scoreOffsetValues.add(Float.parseFloat(lineParts[1]));
+
+			String[] lineParts = line.split("\t");
+			if (lineParts.length != 4) {
+				System.out.printf("Score offset file line %d could not be parsed: %s\n", lineCount++, line);
+				continue;
+			}
+
+			SearchTypeEnum searchType = SearchTypeEnum.REGEX;
+			if (lineParts[0].contentEquals("EXACT")) {
+				searchType = SearchTypeEnum.EXACT;
+			}
+
+			String lookupText = lineParts[1];
+			double scoreAdjustment = Double.valueOf(lineParts[2]);
+
+			boolean stopAfter = false;
+			if (lineParts[3].contentEquals("T")) {
+				stopAfter = true;
+			}
+
+			scoreOffsetRules.add(new ScoreOffsetRule(searchType, lookupText, scoreAdjustment, stopAfter));
 		}
 
 		bufferedReader.close();
@@ -188,23 +206,30 @@ public class IndexCreator {
 					}
 					
 					boolean addDocument = true;
-					
-					for(int i = 0; i < scoreOffsetPatterns.size(); i++) {
-						if ( scoreOffsetPatterns.get(i).matcher(docTitle).find() ) {
-							docScore = (docScore + scoreOffsetValues.get(i));
-							// Skip documents that match a scoreOffset with a score of 0
-							if (scoreOffsetValues.get(i) == 0) {
-								addDocument = false;
-							}
-						}
-					}
+					for (ScoreOffsetRule scoreOffsetRule :	scoreOffsetRules) {
+						if (scoreOffsetRule.applies(docTitle) == false)
+							continue;
 
-					documentIDs.putIfAbsent(docTitle, Double.parseDouble(lineId));
+						// Skip documents that match with a score adjustment of 0
+						if (scoreOffsetRule.scoreAdjustment == 0) {
+							addDocument = false;
+							break;
+						}
+						
+						docScore = docScore + scoreOffsetRule.scoreAdjustment;
+
+						if (scoreOffsetRule.stopAfter)
+							break;
+					}
 
 					// Add the document to the index
 					try {
-						if (addDocument)
-							writer.addDocument(schema.createDocument(docTitle, docContent, docScore, documentIDs.get(docTitle)));
+						if (addDocument) {
+							Double docId = documentIDs.putIfAbsent(docTitle, Double.parseDouble(lineId));
+							if (docId == null)
+								docId = Double.parseDouble(lineId);
+							writer.addDocument(schema.createDocument(docTitle, docContent, docScore, docId ));
+						}
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
