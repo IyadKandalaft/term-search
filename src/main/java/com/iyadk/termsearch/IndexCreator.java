@@ -22,8 +22,11 @@ import java.util.regex.PatternSyntaxException;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DoubleDocValuesField;
+import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -91,7 +94,7 @@ public class IndexCreator {
 		while ((line = bufferedReader.readLine()) != null) {
 			lineCount++;
 			// Skip comments
-			if (line.matches("^\\s*#")) {
+			if (line.matches("^\\s*#.+")) {
 				continue;
 			}
 
@@ -311,7 +314,8 @@ public class IndexCreator {
 		}
 	}
 
-	private class IndexSchema{
+	private class IndexSchema {
+		private FieldType docIdField;
 		private FieldType titleField;
 		private FieldType contentField;
 		
@@ -322,7 +326,7 @@ public class IndexCreator {
 		/*
 		 * Creates the field types for the index
 		 */
-		private void createSchema() {
+		private void createSchema() {			
 			titleField = new FieldType();
 			titleField.setOmitNorms( true );
 			titleField.setIndexOptions( IndexOptions.DOCS );
@@ -352,6 +356,7 @@ public class IndexCreator {
 			doc.add(new Field("content", content, contentField));
 			doc.add(new DoubleDocValuesField("score", score));
 			doc.add(new DoubleDocValuesField("docid", docId));
+			doc.add(new StoredField("docId", docId));
 
 			return doc;
 		}
