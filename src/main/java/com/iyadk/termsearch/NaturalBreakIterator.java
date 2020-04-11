@@ -156,17 +156,32 @@ public class NaturalBreakIterator extends BreakIterator {
 	// called at start of new Passage given first word start offset
 	@Override
 	public int preceding(int offset) {
-		final int baseIterIndex = baseIterator.preceding(offset);
-		
-		if (baseIterIndex == DONE)
-			return DONE;
-
     	final int minBreakIndex = Math.max(offset - maxLength + queryOffset + 1, 0);
 	    final int maxBreakIndex = Math.max(offset - minLength + queryOffset + 1, 0);
-		
-		// The baseIterator returned an acceptable break that is within our range
-		if (minBreakIndex <= baseIterIndex)
+
+		int baseIterIndex = offset;
+		while (true) {
+			baseIterIndex = baseIterator.preceding(baseIterIndex);
+
+			// If we are at the beginning of the text, we're done
+			if (baseIterIndex == DONE)
+				return DONE;
+
+			// The baseIterator went past the minimum break index - that's not good
+			if (baseIterIndex < minBreakIndex)
+				break;
+
+			// Did we go far enough back to ensure that the minimum length
+			// can be met when this.following(offset) is called?
+			if (baseIterIndex + minLength > text.getEndIndex())
+				continue;
+
+			// Did base iterator return a break that's too close to the offset?
+			if (offset - baseIterIndex < 3)
+				continue;
+
 			return current = baseIterIndex;
+		}
 
 		// If the break's distance from the offset is more than the max length
 		// then the break is too far and we have to find a closer one
@@ -177,16 +192,26 @@ public class NaturalBreakIterator extends BreakIterator {
 	    	
     	// Look for a break character [, : ; ] starting within the maximum length
     	// This is a preferred natural break since it's within our target length range
-    	char currChar = text.previous();
+    	char currChar;
     	int lastSpaceIndex = -1;
-    	while(searchIndex > minBreakIndex && currChar != ',' && currChar != ':' && currChar != ';') {
-    		// Keep track of the last word boundary
-    		if (currChar == ' ')
-    			lastSpaceIndex = searchIndex + 1;
-    		currChar = text.previous();
-    		searchIndex = text.getIndex();
-    	}
-	    
+		while (true) {
+			currChar = text.previous();
+			searchIndex = text.getIndex();
+			// Keep track of the last word boundary
+			if (currChar == ' ')
+				lastSpaceIndex = searchIndex + 1;
+
+			if (searchIndex < minBreakIndex)
+				break;
+
+			if (currChar == ',' || currChar == ':' || currChar == ';') {
+				// The current searchIndex is at a boundary that is too close to end of the text
+				if (text.getEndIndex() - searchIndex < minLength)
+					continue;
+				break;
+			}
+		}
+
     	// A break character was found within our range
     	if (searchIndex > minBreakIndex) {
     		text.setIndex(searchIndex + 1);
