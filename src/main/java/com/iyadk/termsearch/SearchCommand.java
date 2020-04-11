@@ -30,27 +30,41 @@ public class SearchCommand implements Callable<Integer> {
 			paramLabel="FILE")
 	private String outputFile;
 	
-	@Option(names={"-m", "--match-limit"},
-			description="Maximum number of matches to return (default: ${DEFAULT-VALUE})",
-			defaultValue="100",
-			type=Integer.class, 
+	@Option(names={"-ml", "--match-limit"},
+			description="Maximum number of matches to review (default: ${DEFAULT-VALUE})",
+			defaultValue="20",
+			type=Integer.class,
 			paramLabel="NUM")
 	private Integer matchLimit;
-	
+
+	@Option(names={"-rl", "--result-limit"},
+			description="Maximum number of matches to return (default: ${DEFAULT-VALUE})",
+			defaultValue="5",
+			type=Integer.class,
+			paramLabel="NUM")
+	private Integer resultLimit;
+
+	@Option(names={"-sl", "--source-limit"},
+			description="Maximum number of matches to return per source (default: ${DEFAULT-VALUE})",
+			defaultValue="130",
+			type=Integer.class,
+			paramLabel="NUM")
+	private Integer sourceLimit;
+
 	@Option(names={"-hs", "--highlight-min"},
 			description="Minimum number of characters to return surrounding a matched term (default: ${DEFAULT-VALUE})",
-			defaultValue="50",
+			defaultValue="70",
 			type=Integer.class,
 			paramLabel="NUM")
 	private Integer highlightMin;
-	
+
 	@Option(names={"-hx", "--highlight-max"},
 			description="Maximum number of characters to return surrounding a matched term (default: ${DEFAULT-VALUE})",
 			defaultValue="180",
 			type=Integer.class,
 			paramLabel="NUM")
 	private Integer highlightMax;
-	
+
 	@Option(names={"-s", "--scoring", "--scoring-formula"},
 			description="Result scoring formula. (default: ${DEFAULT-VALUE})\n"
 					+ "Computed vars: _score (lucene search score), score (parsed doc score), & docMatchCount (# of times doc has matched)\n"
@@ -76,13 +90,16 @@ public class SearchCommand implements Callable<Integer> {
 		System.out.println("Executing search command");
 		
 		SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-		
+
 		System.out.println("Start time: " + dateFormatter.format(new Date()));
 		System.out.println("-------------------------------------------------------");
-		
+
+		// TODO: Check if index exists and exit gracefully
 		SearchIndex indexSearcher = new SearchIndex(termsFile, outputFile, indexDir);
 
-		indexSearcher.setSearchLimit(matchLimit);
+		indexSearcher.setMatchLimit(matchLimit);
+		indexSearcher.setResultLimit(resultLimit);
+		indexSearcher.setSourceLimit(sourceLimit);
 		indexSearcher.setHighlightLimit(highlightMin, highlightMax);
 		indexSearcher.setNumThreads(threads);
 		indexSearcher.setScoring(scoring);

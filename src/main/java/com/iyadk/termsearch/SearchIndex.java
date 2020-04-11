@@ -40,7 +40,9 @@ public class SearchIndex {
 	private Path termsPath;
 	private Path indexPath;
 	private Path outputPath;
-	private int searchLimit = 100;
+	private int matchLimit = 20;
+	private int resultLimit = 5;
+	private int sourceLimit = 125;
 	private int highlightMin = 50;
 	private int highlightMax = 180;
 	private String scoringFormula = "_score / score";
@@ -52,27 +54,42 @@ public class SearchIndex {
 	private final Analyzer analyzer;
 	public final IndexSearcher searcher;
 
-	/*
+	/**
+	 * 
 	 * @param terms Path to file with each search phrase/term per line
 	 */
 	public SearchIndex(String terms) throws IOException {
 		this(terms, "output.tsv");
 	}
 
-	/*
-	 * @param terms Path to file with each search phrase/term per line
+	/**
 	 *
+	 * @param terms Path to file with each search phrase/term per line
 	 * @param output Path to output file where results are written
 	 */
 	public SearchIndex(String terms, String output) throws IOException {
 		this(terms, output, "./lucene-index");
 	}
 
-	/*
+	/**
+	 * @return Maximum number of matches to review
+	 */
+	public int getMatchLimit() {
+		return matchLimit;
+	}
+
+	/**
+	 * @param matchLimit Maximum number of matches to review
+	 */
+	public void setMatchLimit(int matchLimit) {
+		this.matchLimit = matchLimit;
+	}
+
+	/**
+	 * Creates a SearchIndex object that is used to search for terms in the lucene index
+	 * 
 	 * @param terms Path to file with each phrase/term per line
-	 *
 	 * @param output Path to output file where results are written
-	 *
 	 * @param index Path to lucene index directory
 	 */
 	public SearchIndex(String terms, String output, String index) throws IOException {
@@ -119,7 +136,7 @@ public class SearchIndex {
 		// that the current document has had previously
 		Method docMatchCountMethod;
 		try {
-			docMatchCountMethod = SearchDocumentMatches.class.getMethod("incrementDocMatchCount", double.class);
+			docMatchCountMethod = SearchDocumentMatches.class.getMethod("getDocMatchCount", double.class);
 			functions.put("docMatchCount", docMatchCountMethod);
 		} catch (NoSuchMethodException e) {
 			System.out.println("The SearchDocumentMatches.incrementDocMatchCount method is missing");
@@ -142,12 +159,36 @@ public class SearchIndex {
 		}
 	}
 
-	public int getSearchLimit() {
-		return searchLimit;
+	/**
+	 * Get the maximum results to generate per term
+	 * @return Maximum number of results
+	 */
+	public int getResultLimit() {
+		return resultLimit;
 	}
 
-	public void setSearchLimit(int searchLimit) {
-		this.searchLimit = searchLimit;
+	/**
+	 * Set the maximum results to generate per term
+	 * @param resultLimit Maximum number of results  
+	 */
+	public void setResultLimit(int resultLimit) {
+		this.resultLimit = resultLimit;
+	}
+
+	/**
+	 * Get the maximum results to generate per source
+	 * @return Maximum number of results per source
+	 */
+	public int getSourceLimit() {
+		return sourceLimit + 1;
+	}
+
+	/**
+	 * Set the maximum results to generate per source
+	 * @param sourceLimit Maximum number of results per source
+	 */
+	public void setSourceLimit(int sourceLimit) {
+		this.sourceLimit = sourceLimit - 1;
 	}
 
 	public int[] getHighlightLimit() {
@@ -226,19 +267,34 @@ public class SearchIndex {
 								highlighter.setMaxLength(Integer.MAX_VALUE - 1);
 								
 								NaturalBreakIterator lengthBreakIterator = new NaturalBreakIterator(highlightMin, highlightMax, searchString.length());
-								PassageScorer scorer = new PassageScorer(0, 0, 82);
-								highlighter.setScorer(scorer);
+								highlighter.setHandleMultiTermQuery(true);
+								highlighter.setHighlightPhrasesStrictly(true);
 								highlighter.setBreakIterator(() -> lengthBreakIterator);
 								highlighter.setFormatter(new DefaultPassageFormatter("", "", "...", false));
 
 								fragments = highlighter.highlight(field, query, searchResults, 1);
 
+								int resultCount = 0;
 								for (int i = 0; i < searchResults.scoreDocs.length; i++) {
 									Document doc = searcher.doc(searchResults.scoreDocs[i].doc);
 									String fragment = fragments[i];
 
+									// Skip this match if it doesn't meet our length requirements
+									if (fragment.length() < highlightMin || fragment.length() > highlightMax)
+										continue;
+
+									final double docId = doc.getField("docId").numericValue().doubleValue();
+									double docCount = SearchDocumentMatches.incrementDocMatchCount(docId);
+
+									if (docCount > sourceLimit)
+										continue;
+
 									bufferedWriter.write(searchString + "\t" + fragment.replaceAll("[\\t\\r\\n]",  " ") +
 											"\t" + doc.get("title").replaceAll("[\\t\\r\\n]", " ") + lnSeperator);
+
+									resultCount++;
+									if (resultCount == resultLimit)
+										break;
 								}
 							}
 						} catch ( IOException e ) {
@@ -272,18 +328,19 @@ public class SearchIndex {
 	 */
 	public TopDocs searchPhrase(String phrase, String field) throws IOException {
 		Query query = getQuery(phrase, field);
-		return searchPhrase(query);
+		return searchPhrase(query, this.matchLimit);
 	}
-
-	/*
+	
+	/**
 	 * Search for a query in the loaded index
 	 *
 	 * @param query Query to search the index with
+	 * @param maxResults Maximum number of results to return
 	 *
 	 * @return TopDocs results
 	 */
-	public TopDocs searchPhrase(Query query) throws IOException {
-		return searcher.search(query, searchLimit);
+	public TopDocs searchPhrase(Query query, int maxResults) throws IOException {
+		return searcher.search(query, maxResults);
 	}
 
 	private Query getQuery(String phrase, String field) {
