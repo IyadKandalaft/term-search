@@ -9,7 +9,7 @@ public class SearchDocumentMatches {
 		if (docMatches.containsKey(docID))
 			return docMatches.get(docID);
 		else
-			return 0;
+			return 1;
 	}
 	
 	public static ConcurrentHashMap<Double,Double> getAllMatches(){
