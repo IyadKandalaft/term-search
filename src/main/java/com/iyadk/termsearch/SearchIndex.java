@@ -5,7 +5,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,7 +30,6 @@ import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.uhighlight.DefaultPassageFormatter;
-import org.apache.lucene.search.uhighlight.PassageScorer;
 import org.apache.lucene.search.uhighlight.UnifiedHighlighter;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
@@ -47,6 +45,7 @@ public class SearchIndex {
 	private int highlightMax = 180;
 	private String scoringFormula = "_score / score";
 	private DoubleValuesSource scoringMethod;
+	private boolean explainScoring = false;
 	private int numThreads = 4;
 
 	private final Directory dirIndex;
@@ -160,6 +159,22 @@ public class SearchIndex {
 	}
 
 	/**
+	 * 
+	 * @return True if a scoring explanation will be provided with the output. 
+	 */
+	public boolean isExplainScoring() {
+		return explainScoring;
+	}
+
+	/**
+	 * Toggle scoring explanation output
+	 * @param explainScoring Set to true to provide a scoring explanation in the output
+	 */
+	public void setExplainScoring(boolean explainScoring) {
+		this.explainScoring = explainScoring;
+	}
+
+	/**
 	 * Get the maximum results to generate per term
 	 * @return Maximum number of results
 	 */
@@ -255,13 +270,13 @@ public class SearchIndex {
 					@Override
 					public void run() {
 						Query query = getQuery(searchString, field);
+						StringBuilder scoringExplanation = new StringBuilder();
 
 						TopDocs searchResults;
 						String[] fragments;
 						try {
 							searchResults = searchPhrase(searchString, field);
-
-							if ( searchResults.totalHits.value != 0 ) {
+							if ( searchResults.totalHits.value > 0 ) {
 								// Configure term highlighting in results
 								UnifiedHighlighter highlighter = new UnifiedHighlighter(searcher, analyzer);
 								highlighter.setMaxLength(Integer.MAX_VALUE - 1);
@@ -274,20 +289,37 @@ public class SearchIndex {
 
 								fragments = highlighter.highlight(field, query, searchResults, 1);
 
+								if (explainScoring) {
+									for (int z = 0; z < searchResults.scoreDocs.length; z++) {
+										scoringExplanation.append("Match #" + String.valueOf(z) + lnSeperator);
+										scoringExplanation.append(searcher.explain(query, searchResults.scoreDocs[z].doc));
+									}
+								}
+								
 								int resultCount = 0;
 								for (int i = 0; i < searchResults.scoreDocs.length; i++) {
 									Document doc = searcher.doc(searchResults.scoreDocs[i].doc);
 									String fragment = fragments[i];
 
 									// Skip this match if it doesn't meet our length requirements
-									if (fragment.length() < highlightMin || fragment.length() > highlightMax)
+									if (fragment.length() < highlightMin || fragment.length() > highlightMax) {
+										if (explainScoring) {
+											scoringExplanation.append("Skipping match #" + String.valueOf(i));
+											scoringExplanation.append(" because it doesn't meet excerpt length limits" + lnSeperator);
+										}
 										continue;
+									}
 
 									final double docId = doc.getField("docId").numericValue().doubleValue();
 									double docCount = SearchDocumentMatches.incrementDocMatchCount(docId);
 
-									if (docCount > sourceLimit)
+									if (docCount > sourceLimit) {
+										if (explainScoring) {
+											scoringExplanation.append("Skipping match #" + String.valueOf(i));
+											scoringExplanation.append(" because the source has been used too many times" + lnSeperator);
+										}
 										continue;
+									}
 
 									bufferedWriter.write(searchString + "\t" + fragment.replaceAll("[\\t\\r\\n]",  " ") +
 											"\t" + doc.get("title").replaceAll("[\\t\\r\\n]", " ") + lnSeperator);
@@ -303,11 +335,13 @@ public class SearchIndex {
 						}
 
 						System.out.print("Searching for: " + searchString + lnSeperator +
-								"Total Results: " + searchResults.totalHits + lnSeperator);
+								"Total Results: " + searchResults.totalHits + lnSeperator +
+								scoringExplanation + lnSeperator);
 					}
 				}
 
 				threadPool.execute(new subSearch(phrase));
+				
 			}
 		}
 

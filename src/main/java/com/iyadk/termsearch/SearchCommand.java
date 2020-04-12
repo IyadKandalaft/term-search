@@ -73,6 +73,13 @@ public class SearchCommand implements Callable<Integer> {
 			type=String.class
 			)
 	private String scoring;
+	
+	@Option(names={"-e", "--explain", "--explain-scoring"},
+			description="Provides an explanation of results by providing the considered excerpts and their score\n",
+			defaultValue="false",
+			type=Boolean.class
+			)
+	private Boolean explainScoring;
 
 	@Option(names={"--threads"},
 			description="Number of threads/cores to use for searching (default: ${DEFAULT-VALUE})",
@@ -103,6 +110,7 @@ public class SearchCommand implements Callable<Integer> {
 		indexSearcher.setHighlightLimit(highlightMin, highlightMax);
 		indexSearcher.setNumThreads(threads);
 		indexSearcher.setScoring(scoring);
+		indexSearcher.setExplainScoring(explainScoring);
 		indexSearcher.searchAll("content");
 
 		indexSearcher.close();
