@@ -164,8 +164,10 @@ public class NaturalBreakIterator extends BreakIterator {
 			baseIterIndex = baseIterator.preceding(baseIterIndex);
 
 			// If we are at the beginning of the text, we're done
-			if (baseIterIndex == DONE)
+			if (baseIterIndex == DONE) {
+				current = baseIterator.last();
 				return DONE;
+			}
 
 			// The baseIterator went past the minimum break index - that's not good
 			if (baseIterIndex < minBreakIndex)
@@ -177,17 +179,15 @@ public class NaturalBreakIterator extends BreakIterator {
 				continue;
 
 			// Did base iterator return a break that's too close to the offset?
-			if (offset - baseIterIndex < 3)
-				continue;
+			//if (offset - baseIterIndex < 3)
+			//	continue;
 
 			return current = baseIterIndex;
 		}
 
-		// If the break's distance from the offset is more than the max length
+		// If the baseIterator's break distance from the offset is larger than the max length
 		// then the break is too far and we have to find a closer one
-	    // we need to find an acceptable preceding break where the offset + break index 
-    	// are within the maxLength
-    	int searchIndex = offset - 1;
+    	int searchIndex = offset - queryOffset * 2;
     	text.setIndex(searchIndex);
 	    	
     	// Look for a break character [, : ; ] starting within the maximum length
