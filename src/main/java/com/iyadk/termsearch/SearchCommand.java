@@ -1,5 +1,6 @@
 package com.iyadk.termsearch;
 
+import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.Callable;
@@ -65,6 +66,13 @@ public class SearchCommand implements Callable<Integer> {
 			paramLabel="NUM")
 	private Integer highlightMax;
 
+	@Option(names={"-x", "--exclude", "--exclude-words"},
+			description="File of words to exclude words found in the file (one word per line)",
+			required=false,
+			type=Path.class
+			)
+	private Path excludeWordsPath;	
+
 	@Option(names={"-s", "--scoring", "--scoring-formula"},
 			description="Result scoring formula. (default: ${DEFAULT-VALUE})\n"
 					+ "Computed vars: _score (lucene search score), score (parsed doc score), & docMatchCount (# of times doc has matched)\n"
@@ -104,6 +112,9 @@ public class SearchCommand implements Callable<Integer> {
 		// TODO: Check if index exists and exit gracefully
 		SearchIndex indexSearcher = new SearchIndex(termsFile, outputFile, indexDir);
 
+		if (excludeWordsPath != null) {
+			indexSearcher.setExcludedWords(excludeWordsPath);
+		}
 		indexSearcher.setMatchLimit(matchLimit);
 		indexSearcher.setResultLimit(resultLimit);
 		indexSearcher.setSourceLimit(sourceLimit);

@@ -11,7 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -46,6 +48,7 @@ public class SearchIndex {
 	private String scoringFormula = "_score / score";
 	private DoubleValuesSource scoringMethod;
 	private boolean explainScoring = false;
+	private MatchList excludedWords;
 	private int numThreads = 4;
 
 	private final Directory dirIndex;
@@ -68,13 +71,6 @@ public class SearchIndex {
 	 */
 	public SearchIndex(String terms, String output) throws IOException {
 		this(terms, output, "./lucene-index");
-	}
-
-	/**
-	 * @return Maximum number of matches to review
-	 */
-	public int getMatchLimit() {
-		return matchLimit;
 	}
 
 	/**
@@ -102,6 +98,7 @@ public class SearchIndex {
 		searcher = new IndexSearcher(reader);
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
 
+		setExcludedWords(new ArrayList<String>());
 		setScoring(scoringFormula);
 	}
 
@@ -172,6 +169,42 @@ public class SearchIndex {
 	 */
 	public void setExplainScoring(boolean explainScoring) {
 		this.explainScoring = explainScoring;
+	}
+
+	/**
+	 * Set a list of words to exclude from the results
+	 * @param excludedWords A list of words to exclude from the results
+	 */
+	public void setExcludedWords(List<String> excludedWords) {
+		this.excludedWords = new MatchList(excludedWords);
+		System.out.printf("Added %d words to the exclusion list" + System.lineSeparator(), this.excludedWords.count());
+	}
+
+	/**
+	 * Set a list of words to exclude from the results
+	 * @param excludedWordsFile A file with words to exclude from the results
+	 */
+	public void setExcludedWords(Path excludedWordsFile) {
+		try {
+			setExcludedWords(Files.readAllLines(excludedWordsFile));
+		} catch (IOException e) {
+			System.out.println("Cannot read Excluded Words file " + excludedWordsFile);
+		}
+	}
+
+	/**
+	 * 
+	 * @return A MatchList object containing words to exclude 
+	 */
+	public MatchList getExcludedWords() {
+		return excludedWords;
+	}
+
+	/**
+	 * @return Maximum number of matches to review
+	 */
+	public int getMatchLimit() {
+		return matchLimit;
 	}
 
 	/**
@@ -272,10 +305,14 @@ public class SearchIndex {
 						Query query = getQuery(searchString, field);
 						StringBuilder scoringExplanation = new StringBuilder();
 
-						TopDocs searchResults;
+						TopDocs searchResults = null;
 						String[] fragments;
+
+						int resultCount = 0;
+
 						try {
-							searchResults = searchPhrase(searchString, field);
+							searchMultiplier: for (int searchMultiplier = 1; searchMultiplier < 4; searchMultiplier++) {
+							searchResults = searchPhrase(searchString, field, searchMultiplier);
 							if ( searchResults.totalHits.value > 0 ) {
 								// Configure term highlighting in results
 								UnifiedHighlighter highlighter = new UnifiedHighlighter(searcher, analyzer);
@@ -296,7 +333,6 @@ public class SearchIndex {
 									}
 								}
 								
-								int resultCount = 0;
 								for (int i = 0; i < searchResults.scoreDocs.length; i++) {
 									Document doc = searcher.doc(searchResults.scoreDocs[i].doc);
 									String fragment = fragments[i];
@@ -304,8 +340,30 @@ public class SearchIndex {
 									// Skip this match if it doesn't meet our length requirements
 									if (fragment.length() < highlightMin || fragment.length() > highlightMax) {
 										if (explainScoring) {
-											scoringExplanation.append("Skipping match #" + String.valueOf(i));
-											scoringExplanation.append(" because it doesn't meet excerpt length limits" + lnSeperator);
+											scoringExplanation.append("Skipping match #");
+											scoringExplanation.append(String.valueOf(i)); 
+											scoringExplanation.append(" because it doesn't meet excerpt length limits");
+											scoringExplanation.append(lnSeperator);
+										}
+										continue;
+									}
+
+									if ( Character.isLowerCase(fragment.charAt(0)) ) {
+										if (explainScoring) {
+											scoringExplanation.append("Skipping match #");
+											scoringExplanation.append(String.valueOf(i)); 
+											scoringExplanation.append(" because the first character is lower case");
+											scoringExplanation.append(lnSeperator);
+										}
+										continue;
+									}
+
+									if (! excludedWords.phraseMatch(searchString) && excludedWords.phraseMatch(fragment)) {
+										if (explainScoring) {
+											scoringExplanation.append("Skipping match #");
+											scoringExplanation.append(String.valueOf(i)); 
+											scoringExplanation.append(" because it contains an excluded word");
+											scoringExplanation.append(lnSeperator);
 										}
 										continue;
 									}
@@ -315,19 +373,29 @@ public class SearchIndex {
 
 									if (docCount > sourceLimit) {
 										if (explainScoring) {
-											scoringExplanation.append("Skipping match #" + String.valueOf(i));
-											scoringExplanation.append(" because the source has been used too many times" + lnSeperator);
+											scoringExplanation.append("Skipping match #");
+											scoringExplanation.append(String.valueOf(i));
+											scoringExplanation.append(" because the source has been used too many times");
+											scoringExplanation.append(lnSeperator);
 										}
 										continue;
 									}
 
 									bufferedWriter.write(searchString + "\t" + fragment.replaceAll("[\\t\\r\\n]",  " ") +
 											"\t" + doc.get("title").replaceAll("[\\t\\r\\n]", " ") + lnSeperator);
-
+										
 									resultCount++;
-									if (resultCount == resultLimit)
-										break;
+									if (resultCount >= resultLimit)
+										break searchMultiplier;
 								}
+								
+								if (explainScoring) {
+									scoringExplanation.append("Expanding search limit by a factor of ");
+									scoringExplanation.append(String.valueOf(searchMultiplier));
+									scoringExplanation.append(" because we exhausted the current top hits");
+									scoringExplanation.append(lnSeperator);
+								}
+							}
 							}
 						} catch ( IOException e ) {
 							// Something is wrong with reading the index
@@ -364,7 +432,12 @@ public class SearchIndex {
 		Query query = getQuery(phrase, field);
 		return searchPhrase(query, this.matchLimit);
 	}
-	
+
+	public TopDocs searchPhrase(String phrase, String field, int matchLimitMultiplier) throws IOException {
+		Query query = getQuery(phrase, field);
+		return searchPhrase(query, this.matchLimit * matchLimitMultiplier);
+	}
+
 	/**
 	 * Search for a query in the loaded index
 	 *
