@@ -96,14 +96,16 @@ public class NaturalBreakIterator extends BreakIterator {
 	    final int minBreakIndex = Math.min(current + minLength + queryOffset, text.getEndIndex());
 	    // final int maxBreakIndex = Math.min(current + maxLength + queryOffset + 1, text.getEndIndex());
 	    final int maxBreakIndex = Math.min(current + maxLength + 1, text.getEndIndex());
-	    final int queryEndIndex = offset + queryOffset;
+	    //final int queryEndIndex = offset + queryOffset;
 
 	    assert offset < maxBreakIndex;
 
 	    // If the baseIterator returns an index less than our minimum length
 	    // we need to get its next index
 	    int baseIterIndex = baseIterator.following(offset);
+	    int prevBaseIterIndex = baseIterIndex;
 	    while(baseIterIndex < minBreakIndex && baseIterIndex != DONE) {
+	    	prevBaseIterIndex = baseIterIndex;
 	    	baseIterIndex = baseIterator.following(baseIterIndex);
 	    }
 
@@ -118,46 +120,15 @@ public class NaturalBreakIterator extends BreakIterator {
 	    // then the next break is good.
 	    if (baseIterIndex <= maxBreakIndex)
 	    	return current = baseIterIndex;
-	    
-	    // If the baseIterator returns an index that's larger than our maximum length
-	    // we need to find an acceptable break before our maximum length
-	    int searchIndex = maxBreakIndex;
-    	text.setIndex(searchIndex);
-	    	
-    	// Look for the last comma, colon, or semi-colon starting with the maximum length
-    	// This is a preferred break since it's within our target length range
-    	char currChar = text.previous();
-    	int lastSpaceIdx = -1;
 
-    	while(searchIndex > minBreakIndex && searchIndex > queryEndIndex && currChar != ',' && currChar != ':' && currChar != ';') {
-    		// Keep track of the last word boundary
-    		if (currChar == ' ')
-    			lastSpaceIdx = searchIndex;
-    		currChar = text.previous();
-    		searchIndex = text.getIndex();
-    	}
-	    
-    	if (searchIndex > minBreakIndex && searchIndex != queryEndIndex)
-    		return current = searchIndex + 1;
-    	
-    	// We got all the way back to the minimum within our range
-    	// break on the index of the last space
-	    if (lastSpaceIdx != -1) {
-	    	text.setIndex(lastSpaceIdx);
-	    	return current = lastSpaceIdx + 1;
-	    }
-	    
-	    // We didn't find a word boundary, comma, semi-colon, or colon
-	    // Return the maximum within our range
-	    text.setIndex(maxBreakIndex);
-	    return current = maxBreakIndex;
+	    return current = prevBaseIterIndex;
 	}
 
 	// called at start of new Passage given first word start offset
 	@Override
 	public int preceding(int offset) {
     	final int minBreakIndex = Math.max(offset - maxLength + queryOffset + 1, 0);
-	    final int maxBreakIndex = Math.max(offset - minLength + queryOffset + 1, 0);
+	    //final int maxBreakIndex = Math.max(offset - minLength + queryOffset + 1, 0);
 
 		int baseIterIndex = offset;
 		while (true) {
@@ -171,64 +142,51 @@ public class NaturalBreakIterator extends BreakIterator {
 
 			// The baseIterator went past the minimum break index - that's not good
 			if (baseIterIndex < minBreakIndex)
-				break;
+				return current = baseIterIndex;
+				//break;
 
 			// Did we go far enough back to ensure that the minimum length
 			// can be met when this.following(offset) is called?
 			if (baseIterIndex + minLength > text.getEndIndex())
 				continue;
 
-			// Did base iterator return a break that's too close to the offset?
-			//if (offset - baseIterIndex < 3)
-			//	continue;
+			char currentChar = text.setIndex(baseIterIndex);
+
+			// If the first letter is lower case, find another starting point
+			if (Character.isLowerCase(currentChar))
+				continue;
+
+			// If the first letter is a period, we might have stopped at an abbrev.
+			if (currentChar == '.') {
+				char nextChar = text.next();
+				
+				// If the next char is a comma, then it's definitely an abbreviation
+				if (nextChar == ',')
+					continue;
+
+				// If the next char is not a space, the break iterator stopped at a special character
+				if (nextChar != ' ')
+					return current = baseIterIndex + 2;
+
+				char prevChar = text.setIndex(baseIterIndex - 1);
+
+				// If the previous character is an uppercase then it's probably an abbreviation
+				if (Character.isUpperCase(prevChar))
+					continue;
+			}
+
+			// If the first character is a comma, and previous characters are punctuation,
+			// then it's a quote and we need to go back further
+			if (currentChar == ',') {
+				char prevChar = text.previous();
+				if ("!?\"')".indexOf(prevChar) > -1)
+					continue;
+				//if (prevChar == '!' || prevChar == '"' || prevChar == '\'' || prevChar == '?' || prevChar == ')')
+				//	continue;
+			}
 
 			return current = baseIterIndex;
 		}
-
-		// If the baseIterator's break distance from the offset is larger than the max length
-		// then the break is too far and we have to find a closer one
-    	int searchIndex = offset - queryOffset * 2;
-    	text.setIndex(searchIndex);
-	    	
-    	// Look for a break character [, : ; ] starting within the maximum length
-    	// This is a preferred natural break since it's within our target length range
-    	char currChar;
-    	int lastSpaceIndex = -1;
-		while (true) {
-			currChar = text.previous();
-			searchIndex = text.getIndex();
-			// Keep track of the last word boundary
-			if (currChar == ' ')
-				lastSpaceIndex = searchIndex + 1;
-
-			if (searchIndex < minBreakIndex)
-				break;
-
-			if (currChar == ',' || currChar == ':' || currChar == ';') {
-				// The current searchIndex is at a boundary that is too close to end of the text
-				if (text.getEndIndex() - searchIndex < minLength)
-					continue;
-				break;
-			}
-		}
-
-    	// A break character was found within our range
-    	if (searchIndex > minBreakIndex) {
-    		text.setIndex(searchIndex + 1);
-    		return current = searchIndex + 1;  // +1 to ignore the comma/colon char
-    	}
-
-    	// If we detected a space within our range and we got all the way back to the minimum within our range
-    	// break on the index of the space
-	    if (lastSpaceIndex != -1) {
-	    	text.setIndex(lastSpaceIndex);
-	    	return current = lastSpaceIndex;
-	    }
-	    
-	    // We didn't find a word boundary, comma, semi-colon, or colon
-	    // Return the maximum within our range
-	    text.setIndex(maxBreakIndex);
-	    return current = maxBreakIndex;
 	}
 
 	@Override
