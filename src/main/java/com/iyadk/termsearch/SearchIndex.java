@@ -14,6 +14,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -50,6 +51,7 @@ public class SearchIndex {
 	private boolean explainScoring = false;
 	private MatchList excludedWords;
 	private int numThreads = 4;
+	private ExcerptScorer excerptScorer;
 
 	private final Directory dirIndex;
 	private final IndexReader reader;
@@ -97,6 +99,8 @@ public class SearchIndex {
 		reader = DirectoryReader.open(dirIndex);
 		searcher = new IndexSearcher(reader);
 		analyzer = UniqueAnalyzer.getInstance().analyzer;
+
+		excerptScorer = new ExcerptScorer();
 
 		setExcludedWords(new ArrayList<String>());
 		setScoring(scoringFormula);
@@ -295,7 +299,6 @@ public class SearchIndex {
 
 				class subSearch implements Runnable {
 					private final String searchString;
-
 					subSearch(String s) {
 						this.searchString = s;
 					}
@@ -308,12 +311,18 @@ public class SearchIndex {
 						TopDocs searchResults = null;
 						String[] fragments;
 
-						int resultCount = 0;
-
 						try {
+							PriorityQueue<Excerpt> excerptsQueue = new PriorityQueue<>(matchLimit, new ExcerptComparator());
+							
+							int i = 0;
 							searchMultiplier: for (int searchMultiplier = 1; searchMultiplier < 4; searchMultiplier++) {
-							searchResults = searchPhrase(searchString, field, searchMultiplier);
-							if ( searchResults.totalHits.value > 0 ) {
+								searchResults = searchPhrase(searchString, field, searchMultiplier);
+
+								if ( searchResults.totalHits.value == 0 )
+									break;
+								
+								excerptsQueue = new PriorityQueue<>(matchLimit * searchMultiplier, new ExcerptComparator());
+								
 								// Configure term highlighting in results
 								UnifiedHighlighter highlighter = new UnifiedHighlighter(searcher, analyzer);
 								highlighter.setMaxLength(Integer.MAX_VALUE - 1);
@@ -321,6 +330,7 @@ public class SearchIndex {
 								NaturalBreakIterator lengthBreakIterator = new NaturalBreakIterator(highlightMin, highlightMax, searchString.length());
 								highlighter.setHandleMultiTermQuery(true);
 								highlighter.setHighlightPhrasesStrictly(true);
+								highlighter.setScorer(new UniquePassageScorer());
 								highlighter.setBreakIterator(() -> lengthBreakIterator);
 								highlighter.setFormatter(new DefaultPassageFormatter("", "", "...", false));
 
@@ -332,10 +342,9 @@ public class SearchIndex {
 										scoringExplanation.append(searcher.explain(query, searchResults.scoreDocs[z].doc));
 									}
 								}
-								
-								for (int i = 0; i < searchResults.scoreDocs.length; i++) {
-									Document doc = searcher.doc(searchResults.scoreDocs[i].doc);
-									String fragment = fragments[i];
+
+								for (; i < searchResults.scoreDocs.length; i++) {
+									Excerpt fragment = new Excerpt(fragments[i]);
 
 									// Skip this match if it doesn't meet our length requirements
 									if (fragment.length() < highlightMin || fragment.length() > highlightMax) {
@@ -358,7 +367,7 @@ public class SearchIndex {
 										continue;
 									}
 
-									if (! excludedWords.phraseMatch(searchString) && excludedWords.phraseMatch(fragment)) {
+									if (! excludedWords.phraseMatch(searchString) && excludedWords.phraseMatch(fragment.toString())) {
 										if (explainScoring) {
 											scoringExplanation.append("Skipping match #");
 											scoringExplanation.append(String.valueOf(i)); 
@@ -368,26 +377,16 @@ public class SearchIndex {
 										continue;
 									}
 
-									final double docId = doc.getField("docId").numericValue().doubleValue();
-									double docCount = SearchDocumentMatches.incrementDocMatchCount(docId);
+									Document doc = searcher.doc(searchResults.scoreDocs[i].doc);
+									fragment.setDocumentTitle(doc.get("title"));
+									fragment.setDocId(doc.getField("docId").numericValue().doubleValue());
 
-									if (docCount > sourceLimit) {
-										if (explainScoring) {
-											scoringExplanation.append("Skipping match #");
-											scoringExplanation.append(String.valueOf(i));
-											scoringExplanation.append(" because the source has been used too many times");
-											scoringExplanation.append(lnSeperator);
-										}
-										continue;
-									}
-
-									bufferedWriter.write(searchString + "\t" + fragment.replaceAll("[\\t\\r\\n]",  " ") +
-											"\t" + doc.get("title").replaceAll("[\\t\\r\\n]", " ") + lnSeperator);
-										
-									resultCount++;
-									if (resultCount >= resultLimit)
-										break searchMultiplier;
+									excerptScorer.score(fragment);
+									excerptsQueue.offer(fragment);
 								}
+								
+								if (excerptsQueue.size() >= matchLimit || searchResults.totalHits.value < matchLimit)
+									break searchMultiplier;
 								
 								if (explainScoring) {
 									scoringExplanation.append("Expanding search limit by a factor of ");
@@ -396,6 +395,28 @@ public class SearchIndex {
 									scoringExplanation.append(lnSeperator);
 								}
 							}
+
+							int resultCount = 0;
+							while(! excerptsQueue.isEmpty()) {
+								Excerpt excerpt = excerptsQueue.remove();
+								
+								double docCount = SearchDocumentMatches.incrementDocMatchCount(excerpt.getDocId());
+
+								if (docCount > sourceLimit) {
+									if (explainScoring) {
+										scoringExplanation.append("Skipping match ");
+										// scoringExplanation.append(String.valueOf(i));
+										scoringExplanation.append(" because the source has been used too many times");
+										scoringExplanation.append(lnSeperator);
+									}
+									continue;
+								}
+
+								bufferedWriter.write(searchString + "\t" + excerpt.replaceAll("[\\t\\r\\n]",  " ") +
+									"\t" + excerpt.getDocumentTitle().replaceAll("[\\t\\r\\n]", " ") + lnSeperator);
+								
+								if (++resultCount >= resultLimit)
+									break;
 							}
 						} catch ( IOException e ) {
 							// Something is wrong with reading the index
