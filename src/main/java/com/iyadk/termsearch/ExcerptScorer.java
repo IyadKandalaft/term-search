@@ -1,61 +1,60 @@
 package com.iyadk.termsearch;
 
+import java.util.ArrayList;
+
 public class ExcerptScorer {
-	private static final String punctuation = ".,:;!?'\"";
-	private int upperCasePenalty;
-	private int punctuationPenalty;
-	private int digitPenalty;
-	
+	ArrayList<ExcerptFullScorerCriterionI> fullCriteria;
+	ArrayList<ExcerptCharScorerCriterionI> charCriteria;
+
 	public ExcerptScorer() {
-		setUpperCasePenalty(1);
-		setPunctuationPenalty(1);
-		setDigitPenalty(1);
+		fullCriteria = new ArrayList<>();
+		charCriteria = new ArrayList<>();
 	}
 
-	public int getUpperCasePenalty() {
-		return upperCasePenalty;
+	public ExcerptFullScorerCriterionI addFullScoringCriteria(ExcerptFullScorerCriterionI criterion) {
+		fullCriteria.add(criterion);
+		return criterion;
 	}
 
-	public void setUpperCasePenalty(int upperCasePenalty) {
-		this.upperCasePenalty = upperCasePenalty;
+	public ArrayList<ExcerptFullScorerCriterionI> getFullScoringCriteria(){
+		return fullCriteria;
 	}
 
-	public int getPunctuationPenalty() {
-		return punctuationPenalty;
+	public ExcerptCharScorerCriterionI addCharScoringCriteria(ExcerptCharScorerCriterionI criterion) {
+		charCriteria.add(criterion);
+		return criterion;
 	}
 
-	public void setPunctuationPenalty(int punctuationPenalty) {
-		this.punctuationPenalty = punctuationPenalty;
+	public ArrayList<ExcerptCharScorerCriterionI> getCharScoringCriteria(){
+		return charCriteria;
 	}
 
-	public int getDigitPenalty() {
-		return digitPenalty;
-	}
-
-	public void setDigitPenalty(int digitPenalty) {
-		this.digitPenalty = digitPenalty;
-	}
-
-	public int score(Excerpt excerpt) {
+	public boolean score(Excerpt excerpt, String searchStrnig) {
 		int score = 1;
 
+		for (ExcerptFullScorerCriterionI criterion : fullCriteria) {
+			final ExcerptScorerCriterionResult criterionResult = criterion.score(excerpt, searchStrnig);
+			if (criterionResult.skip)
+				return false;
+			score += criterionResult.score;
+			if (criterion.isLast() && criterionResult.score > 0)
+				break;
+		} 
+		
 		for (int i = 0; i < excerpt.length(); i++){
-		    char currChar = excerpt.charAt(i);
-		    if (Character.isUpperCase(currChar)) {
-		    	score += upperCasePenalty;
-		    	setUpperCasePenalty(upperCasePenalty * 2);
-		    } else if(punctuation.contains(String.valueOf(currChar))) {
-		    	score += punctuationPenalty;
-		    	setPunctuationPenalty(punctuationPenalty * 2);
-		    } else if(Character.isDigit(currChar)) {
-		    	score += digitPenalty;
-		    	setDigitPenalty(digitPenalty * 2);
-		    }
+			char currChar = excerpt.charAt(i);
+			for (ExcerptCharScorerCriterionI criterion : charCriteria) {
+				int delta = criterion.score(currChar);
+				score += delta;
+				if (delta > 0 && criterion.isLast()) {
+					break;
+				}
+			}
 		}
-		
+
 		excerpt.setScore(score);
-		
-		return score;
+
+		return true;
 	}
 
 }

@@ -49,7 +49,7 @@ public class SearchIndex {
 	private String scoringFormula = "_score / score";
 	private DoubleValuesSource scoringMethod;
 	private boolean explainScoring = false;
-	private MatchList excludedWords;
+	// private MatchList excludedWords;
 	private int numThreads = 4;
 	private ExcerptScorer excerptScorer;
 
@@ -102,7 +102,7 @@ public class SearchIndex {
 
 		excerptScorer = new ExcerptScorer();
 
-		setExcludedWords(new ArrayList<String>());
+		//setExcludedWords(new ArrayList<String>());
 		setScoring(scoringFormula);
 	}
 
@@ -159,6 +159,14 @@ public class SearchIndex {
 		}
 	}
 
+	public ExcerptScorer getExcerptScorer() {
+		return excerptScorer;
+	}
+
+	public void setExcerptScorer(ExcerptScorer excerptScorer) {
+		this.excerptScorer = excerptScorer;
+	}
+
 	/**
 	 * 
 	 * @return True if a scoring explanation will be provided with the output. 
@@ -175,10 +183,11 @@ public class SearchIndex {
 		this.explainScoring = explainScoring;
 	}
 
+
 	/**
 	 * Set a list of words to exclude from the results
 	 * @param excludedWords A list of words to exclude from the results
-	 */
+
 	public void setExcludedWords(List<String> excludedWords) {
 		this.excludedWords = new MatchList(excludedWords);
 		System.out.printf("Added %d words to the exclusion list" + System.lineSeparator(), this.excludedWords.count());
@@ -187,7 +196,7 @@ public class SearchIndex {
 	/**
 	 * Set a list of words to exclude from the results
 	 * @param excludedWordsFile A file with words to exclude from the results
-	 */
+
 	public void setExcludedWords(Path excludedWordsFile) {
 		try {
 			setExcludedWords(Files.readAllLines(excludedWordsFile));
@@ -195,14 +204,16 @@ public class SearchIndex {
 			System.out.println("Cannot read Excluded Words file " + excludedWordsFile);
 		}
 	}
+	
 
 	/**
 	 * 
 	 * @return A MatchList object containing words to exclude 
-	 */
+	
 	public MatchList getExcludedWords() {
 		return excludedWords;
 	}
+	*/
 
 	/**
 	 * @return Maximum number of matches to review
@@ -346,7 +357,9 @@ public class SearchIndex {
 								for (; i < searchResults.scoreDocs.length; i++) {
 									Excerpt fragment = new Excerpt(fragments[i]);
 
+									
 									// Skip this match if it doesn't meet our length requirements
+									/*
 									if (fragment.length() < highlightMin || fragment.length() > highlightMax) {
 										if (explainScoring) {
 											scoringExplanation.append("Skipping match #");
@@ -355,8 +368,9 @@ public class SearchIndex {
 											scoringExplanation.append(lnSeperator);
 										}
 										continue;
-									}
+									}*/
 
+									/*
 									if ( Character.isLowerCase(fragment.charAt(0)) ) {
 										if (explainScoring) {
 											scoringExplanation.append("Skipping match #");
@@ -365,8 +379,9 @@ public class SearchIndex {
 											scoringExplanation.append(lnSeperator);
 										}
 										continue;
-									}
+									}*/
 
+									/*
 									if (! excludedWords.phraseMatch(searchString) && excludedWords.phraseMatch(fragment.toString())) {
 										if (explainScoring) {
 											scoringExplanation.append("Skipping match #");
@@ -375,14 +390,16 @@ public class SearchIndex {
 											scoringExplanation.append(lnSeperator);
 										}
 										continue;
-									}
+									}*/
 
 									Document doc = searcher.doc(searchResults.scoreDocs[i].doc);
 									fragment.setDocumentTitle(doc.get("title"));
 									fragment.setDocId(doc.getField("docId").numericValue().doubleValue());
 
-									excerptScorer.score(fragment);
-									excerptsQueue.offer(fragment);
+									// Score the excerpt and add it to the queue
+									// Skip the excerpt of the score function returns false
+									if (excerptScorer.score(fragment, searchString))
+										excerptsQueue.offer(fragment);
 								}
 								
 								if (excerptsQueue.size() >= matchLimit || searchResults.totalHits.value < matchLimit)
