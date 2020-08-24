@@ -52,11 +52,15 @@ public class SearchIndex {
 	// private MatchList excludedWords;
 	private int numThreads = 4;
 	private ExcerptScorer excerptScorer;
+	private boolean expandSearch = true;
+	private int expandIterations = 3;
+	private double expandFactor = 2.0;
 
 	private final Directory dirIndex;
 	private final IndexReader reader;
 	private final Analyzer analyzer;
 	public final IndexSearcher searcher;
+
 
 	/**
 	 * 
@@ -165,6 +169,35 @@ public class SearchIndex {
 
 	public void setExcerptScorer(ExcerptScorer excerptScorer) {
 		this.excerptScorer = excerptScorer;
+	}
+
+	public boolean isExpandSearch() {
+		return expandSearch;
+	}
+
+	public void setExpandSearch(boolean expandSearch) {
+		this.expandSearch = expandSearch;
+		if (! expandSearch)
+			setExpandIterations(0);
+	}
+
+	public int getExpandIterations() {
+		return expandIterations;
+	}
+
+	public void setExpandIterations(int expandIterations) {
+		if (! this.isExpandSearch())
+			this.expandIterations = 0;
+		else
+			this.expandIterations = expandIterations;
+	}
+
+	public double getExpandFactor() {
+		return expandFactor;
+	}
+
+	public void setExpandFactor(double expandFactor) {
+		this.expandFactor = expandFactor;
 	}
 
 	/**
@@ -323,21 +356,24 @@ public class SearchIndex {
 						String[] fragments;
 
 						try {
-							PriorityQueue<Excerpt> excerptsQueue = new PriorityQueue<>(matchLimit, new ExcerptComparator());
+							PriorityQueue<Excerpt> excerptsQueue = new PriorityQueue<>(1, new ExcerptComparator());
 							
 							int i = 0;
-							searchMultiplier: for (int searchMultiplier = 1; searchMultiplier < 4; searchMultiplier++) {
-								searchResults = searchPhrase(searchString, field, searchMultiplier);
+							// TODO: Bug with expansion returning the correct results
+							searchIterLoop: for (int searchIteration = 1; searchIteration <= expandIterations + 1; searchIteration++) {
+								int effectiveMatchLimit = getEffectiveMatchLimit(searchIteration);
+
+								searchResults = searchPhrase(searchString, field, effectiveMatchLimit);
 
 								if ( searchResults.totalHits.value == 0 )
 									break;
-								
-								excerptsQueue = new PriorityQueue<>(matchLimit * searchMultiplier, new ExcerptComparator());
-								
+
+								excerptsQueue = new PriorityQueue<>(effectiveMatchLimit, new ExcerptComparator());
+
 								// Configure term highlighting in results
 								UnifiedHighlighter highlighter = new UnifiedHighlighter(searcher, analyzer);
 								highlighter.setMaxLength(Integer.MAX_VALUE - 1);
-								
+
 								NaturalBreakIterator lengthBreakIterator = new NaturalBreakIterator(highlightMin, highlightMax, searchString.length());
 								highlighter.setHandleMultiTermQuery(true);
 								highlighter.setHighlightPhrasesStrictly(true);
@@ -403,12 +439,13 @@ public class SearchIndex {
 								}
 								
 								if (excerptsQueue.size() >= matchLimit || searchResults.totalHits.value < matchLimit)
-									break searchMultiplier;
+									break searchIterLoop;
 								
 								if (explainScoring) {
-									scoringExplanation.append("Expanding search limit by a factor of ");
-									scoringExplanation.append(String.valueOf(searchMultiplier));
-									scoringExplanation.append(" because we exhausted the current top hits");
+									scoringExplanation.append("Expanding search limit because we exhausted the current top matches.");
+									scoringExplanation.append(lnSeperator);
+									scoringExplanation.append("New match limit is: ");
+									scoringExplanation.append(String.valueOf(getEffectiveMatchLimit(searchIteration + 1)));
 									scoringExplanation.append(lnSeperator);
 								}
 							}
@@ -417,7 +454,7 @@ public class SearchIndex {
 							while(! excerptsQueue.isEmpty()) {
 								Excerpt excerpt = excerptsQueue.remove();
 								
-								double docCount = SearchDocumentMatches.incrementDocMatchCount(excerpt.getDocId());
+								double docCount = SearchDocumentMatches.getDocMatchCount(excerpt.getDocId());
 
 								if (docCount > sourceLimit) {
 									if (explainScoring) {
@@ -428,6 +465,8 @@ public class SearchIndex {
 									}
 									continue;
 								}
+
+								SearchDocumentMatches.incrementDocMatchCount(excerpt.getDocId());
 
 								bufferedWriter.write(searchString + "\t" + excerpt.replaceAll("[\\t\\r\\n]",  " ") +
 									"\t" + excerpt.getDocumentTitle().replaceAll("[\\t\\r\\n]", " ") + lnSeperator);
@@ -458,8 +497,22 @@ public class SearchIndex {
 		bufferedWriter.close();
 	}
 
+	/**
+	 * Get the effective match limit depending on whether expandSearch is set to true
+	 * and the current search iteration and expand factor
+	 * 
+	 * @param searchIteration Search iteration number
+	 * @return
+	 */
+	private int getEffectiveMatchLimit(int searchIteration) {
+		if (this.isExpandSearch() && searchIteration != 1) {
+			return (int) (this.matchLimit * Math.pow(this.expandFactor, searchIteration - 1));
+		}
+		return this.matchLimit;
+	}
+
 	/*
-	 * Search for specific phrase or term in the loaded index
+	 * Search for specific phrase or term in the loaded index using the defined matchLimit
 	 *
 	 * @param phrase Phrase or term to search for
 	 * @param field Name of the field to search
@@ -471,9 +524,18 @@ public class SearchIndex {
 		return searchPhrase(query, this.matchLimit);
 	}
 
-	public TopDocs searchPhrase(String phrase, String field, int matchLimitMultiplier) throws IOException {
+	/*
+	 * Search for specific phrase or term in the loaded index and retrieve and limit the number of results
+	 *
+	 * @param phrase Phrase or term to search for
+	 * @param field Name of the field to search
+	 * @param maxResults Maximum number of results to return 
+	 *
+	 * @return TopDocs results
+	 */
+	public TopDocs searchPhrase(String phrase, String field, int maxResults) throws IOException {
 		Query query = getQuery(phrase, field);
-		return searchPhrase(query, this.matchLimit * matchLimitMultiplier);
+		return searchPhrase(query, maxResults);
 	}
 
 	/**

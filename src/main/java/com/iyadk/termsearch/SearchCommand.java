@@ -212,6 +212,27 @@ public class SearchCommand implements Callable<Integer> {
 	private Boolean explainScoring;
 	//}
 
+	@Option(names={"-es", "--expand-search"},
+			description="If no results are found, repeat the search with an increased match limit\n",
+			defaultValue="true",
+			type=Boolean.class
+			)
+	private Boolean expandSearch;
+
+	@Option(names={"-ei", "--expand-iterations"},
+			description="If search expansion is enabled, this controls the number of times the search is expanded\n",
+			defaultValue="3",
+			type=Integer.class
+			)
+	private Integer expandIterations;
+
+	@Option(names={"-ef", "--expand-factor"},
+			description="If search expansion is enabled, this controls the expansion multiplier at each iteration (match limit * expand factor * expand iteration)\n",
+			defaultValue="2.0",
+			type=Double.class
+			)
+	private Double expandFactor;
+
 	@Override
 	public Integer call() throws Exception {
 		System.out.println("Executing search command");
@@ -248,6 +269,9 @@ public class SearchCommand implements Callable<Integer> {
 		}
 
 		indexSearcher.setExcerptScorer(excerptScorer);
+		indexSearcher.setExpandSearch(expandSearch);
+		indexSearcher.setExpandIterations(expandIterations);
+		indexSearcher.setExpandFactor(expandFactor);
 		indexSearcher.setMatchLimit(matchLimit);
 		indexSearcher.setResultLimit(resultLimit);
 		indexSearcher.setSourceLimit(sourceLimit);
