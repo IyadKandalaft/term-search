@@ -1,1 +1,8 @@
 lucene-index/
+target/
+[Tt]erm*.txt
+*[Cc]orpus.txt
+!test-*.txt
+*.swp
+*.log
+output/

@@ -15,7 +15,6 @@ public class TermSearchCommand implements Callable<Integer> {
 	boolean help;
 	
 	public static void main(String[] args) {
-		System.out.println("Here");
 		CommandLine cmd = new CommandLine(new TermSearchCommand());
 		System.exit(cmd.execute(args));
 	}

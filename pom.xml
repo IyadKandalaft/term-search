@@ -5,6 +5,11 @@
   <version>0.0.1-SNAPSHOT</version>
   <name>Term Search</name>
   <description>A simple CLI that searches for millions of terms in a large corpus using a minimal set of technologies in an efficient manner</description>
+  <scm>
+    <connection>scm:git:https://github.com/IyadKandalaft/term-search</connection>
+    <developerConnection>scm:git:https://github.com/IyadKandalaft/term-search</developerConnection>
+    <url>https://github.com/IyadKandalaft/term-search</url>
+  </scm>
   <dependencies>
   	<dependency>
   		<groupId>org.apache.lucene</groupId>
@@ -13,6 +18,26 @@
   	<dependency>
   		<groupId>info.picocli</groupId>
   		<artifactId>picocli</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>org.apache.lucene</groupId>
+  		<artifactId>lucene-queryparser</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>org.apache.lucene</groupId>
+  		<artifactId>lucene-analyzers-common</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>org.apache.lucene</groupId>
+  		<artifactId>lucene-highlighter</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>org.apache.lucene</groupId>
+  		<artifactId>lucene-expressions</artifactId>
+  	</dependency>
+  	<dependency>
+  		<groupId>junit</groupId>
+  		<artifactId>junit</artifactId>
   	</dependency>
   </dependencies>
   <dependencyManagement>
@@ -27,6 +52,59 @@
   			<artifactId>picocli</artifactId>
   			<version>4.0.4</version>
   		</dependency>
+  		<dependency>
+  			<groupId>org.apache.lucene</groupId>
+  			<artifactId>lucene-queryparser</artifactId>
+  			<version>8.2.0</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>org.apache.lucene</groupId>
+  			<artifactId>lucene-analyzers-common</artifactId>
+  			<version>8.2.0</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>org.apache.lucene</groupId>
+  			<artifactId>lucene-highlighter</artifactId>
+  			<version>8.2.0</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>org.apache.lucene</groupId>
+  			<artifactId>lucene-expressions</artifactId>
+  			<version>8.2.0</version>
+  		</dependency>
+  		<dependency>
+  			<groupId>junit</groupId>
+  			<artifactId>junit</artifactId>
+  			<version>4.11</version>
+  		</dependency>
   	</dependencies>
   </dependencyManagement>
+  <build>
+	<plugins>
+		<plugin>
+			<groupId>org.apache.maven.plugins</groupId>
+			<artifactId>maven-shade-plugin</artifactId>
+			<version>3.2.1</version>
+			<executions>
+				<execution>
+					<goals>
+						<goal>shade</goal>
+					</goals>
+					<configuration>
+						<shadedArtifactAttached>true</shadedArtifactAttached>
+						<transformers>
+							<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+								<mainClass>com.iyadk.termsearch.TermSearchCommand</mainClass>
+							</transformer>
+						</transformers>
+					</configuration>
+				</execution>
+			</executions>
+		</plugin>
+  	</plugins>
+  </build>
+  <properties>
+    <maven.compiler.source>8</maven.compiler.source>
+    <maven.compiler.target>8</maven.compiler.target>
+  </properties>
 </project>
